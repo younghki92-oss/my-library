@@ -903,7 +903,7 @@ async function openBook(id) {
     try { history.pushState({ reader: 1 }, ''); } catch {}
     applySettings();
     await renderChapter(R.st.loc?.ch || 0, { block: R.st.loc?.block || 0 }, false);
-    requestWake();
+    requestWake(); relayWarm();
     indexBook(book);
   } catch (err) {
     console.error(err);
@@ -1484,6 +1484,29 @@ selbar.addEventListener('click', e => {
 
 /* ================= input: tap, swipe, wheel, keys ================= */
 let ptr = null;
+// right-click selects the word under the pointer (if nothing is selected) and shows only the reader's menu
+stage.addEventListener('contextmenu', e => {
+  if (!R.book || !content.contains(e.target)) return;
+  e.preventDefault();
+  if (R.ext) return;
+  const sel = getSelection();
+  const inSel = !sel.isCollapsed && sel.rangeCount && [...sel.getRangeAt(0).getClientRects()].some(r => e.clientX >= r.left - 2 && e.clientX <= r.right + 2 && e.clientY >= r.top - 2 && e.clientY <= r.bottom + 2);
+  if (!inSel) {
+    const m = e.target.closest('mark.ann');
+    if (m) { sel.removeAllRanges(); return editAnnotation(m.dataset.hid); }
+    const c = caretAt(e.clientX, e.clientY);
+    if (!c || c.node.nodeType !== 3) return;
+    const t = c.node.nodeValue, isW = ch => /[\p{L}\p{N}'’\-]/u.test(ch || '');
+    let a = c.offset, b = c.offset;
+    while (a > 0 && isW(t[a - 1])) a--;
+    while (b < t.length && isW(t[b])) b++;
+    if (a === b) return;
+    const r = document.createRange(); r.setStart(c.node, a); r.setEnd(c.node, b);
+    sel.removeAllRanges(); sel.addRange(r);
+  }
+  clearTimeout(selT); hideHandles(); closePop();
+  showSelbar(visibleRect(sel.getRangeAt(0)), 'new');
+});
 stage.addEventListener('pointerdown', e => { if (e.button > 0) return; ptr = { x: e.clientX, y: e.clientY, t: Date.now(), type: e.pointerType, drag: false }; });
 stage.addEventListener('pointermove', e => {
   if (!ptr || ptr.type === 'mouse' || S.mode !== 'paged') return;
@@ -1750,17 +1773,48 @@ function noteOn(arg, entry) { // append a line to the passage's note, highlighti
 }
 
 /* --- translate --- */
-const TR = { target: ls.get('yb-tr-target', null), cache: new Map() };
-async function translateOnDevice(text, from, to) {
-  if (!('Translator' in self)) return null;
-  const timeout = new Promise(res => setTimeout(() => res(null), 8000));
+const TR = { target: ls.get('yb-tr-target', null), dev: {} };
+// lookups are remembered (this device only), so a word looked up once comes back instantly
+const LK = new Map(Object.entries(ls.get('yb-lk', {})));
+function lkSet(k, v) {
+  LK.delete(k); LK.set(k, v);
+  while (LK.size > 500) LK.delete(LK.keys().next().value);
+  clearTimeout(lkSet.t); lkSet.t = setTimeout(() => ls.set('yb-lk', Object.fromEntries(LK)), 800);
+}
+async function cached(k, fn) {
+  if (LK.has(k)) { const v = LK.get(k); LK.delete(k); LK.set(k, v); return v; }
+  const v = await fn();
+  if (v != null) lkSet(k, v);
+  return v;
+}
+// Chrome's on-device translator (Mac Chrome): the first use downloads the language pack in the
+// background, after that translation happens on the device in a few milliseconds.
+function translateOnDevice(text, from, to) {
+  if (!('Translator' in self) || TR.devBroken) return Promise.resolve(null);
+  const key = from + '>' + to;
   const run = (async () => {
-    // only when the language pack is already on the device; a download would stall the panel
-    if ((await Translator.availability({ sourceLanguage: from, targetLanguage: to })) !== 'available') return null;
-    const tr = await Translator.create({ sourceLanguage: from, targetLanguage: to });
-    return await tr.translate(text);
+    // the availability check answers in milliseconds where the feature works; if it stalls, skip it for this session
+    const avail = await Promise.race([Translator.availability({ sourceLanguage: from, targetLanguage: to }), new Promise(r => setTimeout(() => r('stalled'), 700))]);
+    if (avail === 'stalled') { TR.devBroken = true; return null; }
+    if (avail === 'unavailable') return null;
+    if (!TR.dev[key]) TR.dev[key] = Translator.create({ sourceLanguage: from, targetLanguage: to }).catch(() => { delete TR.dev[key]; return null; });
+    if (avail !== 'available') return null; // the pack is downloading in the background; use the network this time
+    const tr = await TR.dev[key];
+    return tr ? await tr.translate(text) : null;
   })().catch(() => null);
-  return Promise.race([run, timeout]);
+  return Promise.race([run, new Promise(r => setTimeout(() => r(null), 2500))]); // never hold the panel up
+}
+async function translateText(text, from, to) {
+  return cached(`t|${from}|${to}|${text}`, async () => {
+    let r = await translateOnDevice(text, from, to);
+    if (r) return { r, via: '이 기기의 내장 번역' };
+    if (RELAY.tr === true) {
+      r = await translateRelay(text, from, to);
+      if (r) return { r, via: 'Google 번역 (내 Apps Script 중계)' };
+    } else probeRelayTr();
+    r = await translateMyMemory(text, from, to);
+    return { r, via: 'MyMemory 무료 번역 (선택한 글이 MyMemory로 보내져요)' };
+  });
 }
 function chunkText(text, max = 450) { // MyMemory takes about 500 characters per request
   const parts = text.match(/[^.!?。？！\n]+[.!?。？！]*\s*|\n+/g) || [text], out = [];
@@ -1773,16 +1827,15 @@ function chunkText(text, max = 450) { // MyMemory takes about 500 characters per
   if (cur.trim()) out.push(cur);
   return out;
 }
-async function translateMyMemory(text, from, to) {
-  const out = [];
-  for (const c of chunkText(text)) {
-    if (!c.trim()) { out.push(c); continue; }
+async function translateMyMemory(text, from, to) { // chunks in parallel
+  const out = await Promise.all(chunkText(text).map(async c => {
+    if (!c.trim()) return c;
     const r = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(c)}&langpair=${from}|${to}`);
     const j = await r.json();
     if (j.quotaFinished || j.responseStatus === 429) throw new Error('quota');
     if (j.responseStatus !== 200) throw new Error(j.responseDetails || 'failed');
-    out.push(j.responseData.translatedText);
-  }
+    return j.responseData.translatedText;
+  }));
   return out.join(' ').replace(/\s+\n/g, '\n').trim();
 }
 function renderTranslate(arg) {
@@ -1803,14 +1856,10 @@ function renderTranslate(arg) {
     else if ('copy' in b.dataset) copyText(result);
     else if ('save' in b.dataset && result) noteOn(arg, `[번역 · ${LANGS.find(l => l[0] === to)[1]}]\n${result}`);
   };
-  const out = $('#trOut'), key = `${to}|${arg.text}`;
+  const out = $('#trOut');
   (async () => {
     try {
-      let r = TR.cache.get(key)?.r, via = TR.cache.get(key)?.via;
-      if (!r) { r = await translateOnDevice(arg.text, from, to); via = '이 기기의 내장 번역'; }
-      if (!r) { r = await translateRelay(arg.text, from, to); via = 'Google 번역 (내 Apps Script 중계)'; }
-      if (!r) { r = await translateMyMemory(arg.text, from, to); via = 'MyMemory 무료 번역 (선택한 글이 MyMemory로 보내져요)'; }
-      TR.cache.set(key, { r, via });
+      const { r, via } = await translateText(arg.text, from, to);
       if (out !== $('#trOut')) return;
       result = r; out.textContent = r; out.classList.remove('loading');
       $('#trSrc').textContent = '번역: ' + via; $('#trActs').hidden = false;
@@ -1826,7 +1875,15 @@ function renderTranslate(arg) {
 
 /* --- relay: the reader's own Apps Script web app (standard Korean dictionary, Merriam-Webster, translation) --- */
 const DEFAULT_RELAY = 'https://script.google.com/macros/s/AKfycbzxSzcrBdjXlknlexmq87owcLLmR-p5fj4NChwn46lUD1GZlGc6Xf0UwEU-sLL9PU-M/exec';
-const RELAY = { url: ls.get('yb-relay', DEFAULT_RELAY), tr: null };
+const RELAY = { url: ls.get('yb-relay', DEFAULT_RELAY), tr: ls.get('yb-relay-tr', null) };
+// find out once a day, in the background, whether the relay can translate (the Apps Script 'tr' branch)
+function probeRelayTr() {
+  const last = ls.get('yb-relay-tr-at', 0);
+  if (!RELAY.url || RELAY.probing || Date.now() - last < 864e5) return;
+  RELAY.probing = true;
+  relay('tr', { q: 'book', sl: 'en', tl: 'ko' }).then(j => typeof j?.text === 'string', () => false)
+    .then(ok => { RELAY.tr = ok; ls.set('yb-relay-tr', ok); ls.set('yb-relay-tr-at', Date.now()); RELAY.probing = false; });
+}
 function fetchT(url, ms = 7000) {
   const c = new AbortController(), t = setTimeout(() => c.abort(), ms);
   return fetch(url, { signal: c.signal }).finally(() => clearTimeout(t));
@@ -1908,11 +1965,24 @@ function fmtWikt(data, lang) {
     defs: en.definitions.map(d => ({ d: htmlText(d.definition), ex: htmlText(d.parsedExamples?.[0]?.example || d.examples?.[0] || '') })).filter(d => d.d).slice(0, 5),
   }))).filter(e => e.defs.length);
 }
-// try each form of the word at once; keep the earliest form (closest to what was selected) that has entries
-async function firstHit(forms, look) {
-  const res = await Promise.all(forms.map(f => look(f).then(r => r, () => null)));
-  const i = res.findIndex(r => r && r.length);
-  return i < 0 ? null : { form: forms[i], entries: res[i] };
+// ask for each form of the word at once and answer as soon as the earliest form with entries is known
+function firstHit(forms, look) {
+  return new Promise(res => {
+    const got = new Array(forms.length);
+    let errs = 0;
+    const check = () => {
+      for (let i = 0; i < forms.length; i++) {
+        if (got[i] === undefined) return;
+        if (got[i]?.length) return res({ form: forms[i], entries: got[i] });
+      }
+      res(errs === forms.length ? undefined : null);
+    };
+    forms.forEach((f, i) => look(f).then(r => r, () => { errs++; return null; }).then(r => { got[i] = r || null; check(); }));
+  });
+}
+function relayWarm() { // Apps Script sleeps; wake it while the reader is still reading
+  if (!RELAY.url || Date.now() - (RELAY.warm || 0) < 4 * 60000) return;
+  RELAY.warm = Date.now(); fetch(RELAY.url + '?src=ping').catch(() => {});
 }
 function renderDict(arg) {
   const raw = arg.text.replace(/^[\s"'“‘(\[「『]+|[\s"'”’)\]」』.,!?。？！…:;]+$/g, '').split(/\s+/)[0] || arg.text.trim();
@@ -1926,35 +1996,44 @@ function renderDict(arg) {
     <p class="tool-sub">더 찾아보기</p><div class="tool-acts">${links}</div>`;
   let summary = '';
   body().onclick = e => { if (e.target.closest('[data-save]') && summary) noteOn(arg, `[사전 · ${word}]\n${summary}`); };
-  const out = $('#dictOut');
-  (async () => {
-    let hit = null, source = '', thes = null;
-    if (RELAY.url && lang === 'ko') { hit = await firstHit(koForms(word), w => relay('stdict', { q: w }).then(j => fmtStdict(j, w))); source = '표준국어대사전'; }
-    if (RELAY.url && lang === 'en') {
-      const forms = enForms(word);
-      [hit, thes] = await Promise.all([
-        firstHit(forms, w => relay('mw', { q: w }).then(fmtMW)),
-        relay('mwth', { q: forms[0] }).then(fmtMWTh, () => null),
-      ]);
-      source = 'Merriam-Webster';
-    }
-    if (!hit) {
-      const forms = lang === 'ko' ? koForms(word) : lang === 'en' ? enForms(word) : [word, word.toLowerCase()].filter((x, i, a) => a.indexOf(x) === i);
-      hit = await firstHit(forms, w => wiktionary(w).then(d => fmtWikt(d, lang)));
-      source = '위키낱말사전(Wiktionary 영어판)';
-    }
+  const out = $('#dictOut'), secs = [];
+  let pending = 0;
+  const entriesHTML = (hit) => (hit.form !== word ? `<p class="tool-src">‘${esc(word)}’ → ‘${esc(hit.form)}’(으)로 찾았어요.</p>` : '')
+    + hit.entries.map(en => `<div class="dict-lang">${esc(en.head)}</div>${en.pos ? `<span class="dict-pos">${esc(en.pos)}</span>` : ''}<ol class="dict-defs">${en.defs.map(d => `<li>${esc(d.d)}${d.ex ? `<small>${esc(d.ex)}</small>` : ''}</li>`).join('')}</ol>`).join('');
+  const paint = () => {
     if (out !== $('#dictOut')) return;
-    if (!hit) { out.innerHTML = `<p class="empty">‘${esc(word)}’을(를) 사전에서 찾지 못했어요. 아래 링크에서 찾아보세요.</p>`; return; }
-    const lines = [];
-    out.innerHTML = (hit.form !== word ? `<p class="tool-src">‘${esc(word)}’ → ‘${esc(hit.form)}’(으)로 찾았어요.</p>` : '')
-      + hit.entries.map(en => {
-        en.defs.forEach(d => lines.push(`${en.pos ? en.pos + ': ' : ''}${d.d}`));
-        return `<div class="dict-lang">${esc(en.head)}</div>${en.pos ? `<span class="dict-pos">${esc(en.pos)}</span>` : ''}<ol class="dict-defs">${en.defs.map(d => `<li>${esc(d.d)}${d.ex ? `<small>${esc(d.ex)}</small>` : ''}</li>`).join('')}</ol>`;
-      }).join('')
-      + (thes ? `<div class="dict-lang">비슷한 말 · 반대말</div><p class="dict-syn">${thes.syn.length ? '≈ ' + esc(thes.syn.join(', ')) : ''}${thes.ant.length ? '<br>↔ ' + esc(thes.ant.join(', ')) : ''}</p>` : '')
-      + `<p class="tool-src">출처: ${source}</p><div class="tool-acts"><button data-save>메모로 저장</button></div>`;
-    summary = lines.slice(0, 6).join('\n');
-  })();
+    const shown = secs.filter(x => x.html).sort((a, b) => a.order - b.order);
+    out.innerHTML = shown.map(x => `<p class="tool-sub" style="margin-top:12px">${esc(x.title)}</p>${x.html}`).join('')
+      + (pending ? '<p class="tool-src">더 찾는 중…</p>' : shown.length ? '<div class="tool-acts"><button data-save>메모로 저장</button></div>' : `<p class="empty">‘${esc(word)}’을(를) 사전에서 찾지 못했어요. 아래 링크에서 찾아보세요.</p>`);
+  };
+  const source = (title, order, job) => {
+    pending++;
+    const sec = { title, order, html: '' }; secs.push(sec);
+    job().then(h => { sec.html = h || ''; }, () => {}).finally(() => { pending--; paint(); });
+  };
+  const dictSource = (title, order, key, look, forms) => source(title, order, async () => {
+    const hit = await cached(key, () => firstHit(forms, look).then(h => (h === undefined ? undefined : h || {})));
+    if (!hit?.entries) return '';
+    if (!summary) summary = hit.entries.flatMap(en => en.defs.map(d => `${en.pos ? en.pos + ': ' : ''}${d.d}`)).slice(0, 6).join('\n');
+    return entriesHTML(hit);
+  });
+  const formsOf = lang === 'ko' ? koForms(word).slice(0, 3) : lang === 'en' ? enForms(word).slice(0, 3) : [...new Set([word, word.toLowerCase()])];
+  // a quick gloss in the other language comes first: it is usually what a reader wants, and it is the fastest
+  const glossTo = lang === 'ko' ? 'en' : 'ko';
+  source(glossTo === 'ko' ? '한국어 뜻' : 'English', 0, async () => {
+    const { r } = await translateText(word, lang, glossTo);
+    return r && r.toLowerCase() !== word.toLowerCase() ? `<p class="dict-syn" style="font-size:16px">${esc(r)}</p>` : '';
+  });
+  if (RELAY.url && lang === 'ko') dictSource('표준국어대사전', 1, `d|std|${word}`, w => relay('stdict', { q: w }).then(j => fmtStdict(j, w)), formsOf);
+  if (RELAY.url && lang === 'en') {
+    dictSource('Merriam-Webster', 1, `d|mw|${word}`, w => relay('mw', { q: w }).then(fmtMW), formsOf);
+    source('비슷한 말 · 반대말', 2, async () => {
+      const t = await cached(`d|mwth|${formsOf[0]}`, () => relay('mwth', { q: formsOf[0] }).then(j => fmtMWTh(j) || {}));
+      return t?.syn ? `<p class="dict-syn">${t.syn.length ? '≈ ' + esc(t.syn.join(', ')) : ''}${t.ant.length ? '<br>↔ ' + esc(t.ant.join(', ')) : ''}</p>` : '';
+    });
+  }
+  dictSource('위키낱말사전', 3, `d|wk|${lang}|${word}`, w => wiktionary(w).then(d => fmtWikt(d, lang)), formsOf);
+  paint();
 }
 
 /* ================= collections (Apple Books style shelves the reader makes) ================= */
@@ -2283,7 +2362,7 @@ function openDriveDialog() {
     else if (v === 'sync') { await syncNow(); await scanDrive(); toast(G.err ? '맞추지 못했어요: ' + G.err.message : '다른 기기와 맞췄어요'); }
     else if (v === 'save') {
       const fid = $('#gFid').value.trim().replace(/^.*folders\//, '').replace(/[?#].*$/, ''), cid = $('#gCid').value.trim();
-      const relay = $('#gRelay').value.trim(); if (relay !== RELAY.url) { RELAY.url = relay; RELAY.tr = null; ls.set('yb-relay', relay); }
+      const relay = $('#gRelay').value.trim(); if (relay !== RELAY.url) { RELAY.url = relay; RELAY.tr = null; ls.set('yb-relay', relay); ls.set('yb-relay-tr-at', 0); }
       if (cid && cid !== G.cid) { G.cid = cid; ls.set('yb-g-cid', cid); G.client = null; G.token = null; }
       if (fid) { G.fid = fid; ls.set('yb-g-fid', fid); }
       await scanDrive();
