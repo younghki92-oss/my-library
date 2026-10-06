@@ -1,8 +1,8 @@
 {
-  "id": "./?app=yeobaek-2",
-  "name": "여백 리더",
-  "short_name": "여백",
-  "description": "EPUB·TXT 전자책을 맥과 갤럭시에서 같은 방식으로 읽는 리더",
+  "id": "./",
+  "name": "My Library",
+  "short_name": "My Library",
+  "description": "Google Drive의 EPUB·PDF를 맥과 갤럭시에서 이어 읽는 나의 서재",
   "lang": "ko",
   "start_url": "./",
   "scope": "./",

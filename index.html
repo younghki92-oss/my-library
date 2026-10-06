@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>여백 리더</title>
+<title>My Library</title>
 <meta name="theme-color" content="#F3F4F7" id="themeColor">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icon-192.png">
@@ -357,7 +357,7 @@ mark.pend{background:var(--hl-yellow);color:inherit;outline:1.5px dashed var(--a
 
 <section id="library" aria-label="서재">
   <aside id="side" aria-label="서재 메뉴">
-    <div class="brand"><span class="mark" aria-hidden="true"></span>여백</div>
+    <div class="brand"><span class="mark" aria-hidden="true"></span>My Library</div>
     <label class="search"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg><input id="libQ" type="search" placeholder="제목, 저자 검색" autocomplete="off"></label>
     <p class="side-h">서재</p>
     <button class="side-item" data-view="all"><svg viewBox="0 0 24 24"><path d="M4 4.5h3v15H4zM9 4.5h3v15H9zM14.2 5.2l2.9-.8 3.9 14.5-2.9.8z"/></svg><span class="lbl">전체</span><span class="n" id="nAll"></span></button>
@@ -686,11 +686,11 @@ function loadTxt(buf, name) {
 }
 
 /* ================= built-in sample book ================= */
-const SAMPLE_META = { id: 'sample', source: 'sample', format: 'sample', title: '여백에 대하여', author: '여백 리더 안내서', sample: true, addedAt: 0 };
+const SAMPLE_META = { id: 'sample', source: 'sample', format: 'sample', title: '처음 펼치는 책', author: 'My Library 안내서', sample: true, addedAt: 0 };
 const SAMPLE_QUOTE = '읽는 동안에는 아무것도 방해하지 않고, 필요할 때는 손 닿는 곳에 있을 것. 이것이 이 앱이 지키려는 단 하나의 원칙입니다.';
 const SAMPLE = [
   ['첫 장을 넘기며', `<h1>첫 장을 넘기며</h1>
-<p>책을 펼치면 가장 먼저 눈에 들어오는 것은 글자가 아니라 여백입니다. 글자가 놓일 자리를 둘러싼 빈 공간이 넉넉해야 문장이 숨을 쉬고, 읽는 사람의 눈도 쉽게 지치지 않습니다. 여백 리더는 그 빈 공간을 가장 먼저 생각하며 만든 읽기 도구입니다.</p>
+<p>책을 펼치면 가장 먼저 눈에 들어오는 것은 글자가 아니라 여백입니다. 글자가 놓일 자리를 둘러싼 빈 공간이 넉넉해야 문장이 숨을 쉬고, 읽는 사람의 눈도 쉽게 지치지 않습니다. My Library는 그 빈 공간을 가장 먼저 생각하며 만든 읽기 도구입니다.</p>
 <p>이 짧은 안내서는 실제 책처럼 넘겨 보며 기능을 익힐 수 있게 쓰였습니다. 지금 이 문단을 읽고 있다면 이미 첫 번째 기능을 쓰고 있는 셈입니다. 화면의 글자는 기기의 너비와 높이에 맞춰 쪽으로 나뉘고, 글자 크기를 바꾸면 쪽도 다시 나뉩니다. 그래도 읽던 문단은 그대로 제자리에 남아 있습니다.</p>
 <h2>쪽을 넘기는 여러 가지 방법</h2>
 <p>휴대폰에서는 손가락으로 화면을 왼쪽으로 밀면 다음 쪽, 오른쪽으로 밀면 이전 쪽으로 갑니다. 손가락을 떼기 전까지 지면이 손을 따라 움직이니, 넘기다 마음이 바뀌면 그냥 제자리로 돌려놓으면 됩니다. 화면 오른쪽 가장자리를 가볍게 두드려도 다음 쪽으로 넘어가고, 왼쪽 가장자리를 두드리면 앞으로 돌아갑니다.</p>
@@ -701,7 +701,7 @@ const SAMPLE = [
 <p>도구 막대를 열면 책 전체에서의 위치를 보여 주는 막대가 나타납니다. 막대를 끌어 원하는 곳으로 바로 건너뛸 수 있고, 목차 단추를 누르면 장 제목을 보고 이동할 수 있습니다. 앱을 닫았다가 다시 열어도 마지막으로 읽던 문단에서 이어집니다.</p>
 <p>이제 다음 쪽으로 넘겨 두 번째 장으로 가 보세요.</p>`],
   ['밑줄 긋는 법', `<h1>밑줄 긋는 법</h1>
-<p>종이책을 읽을 때 연필을 쥐는 사람이 있습니다. 마음에 드는 문장 아래에 줄을 긋고, 여백에 짧은 생각을 적고, 다시 펼쳐 볼 쪽의 모서리를 접습니다. 여백 리더에서도 같은 일을 할 수 있습니다.</p>
+<p>종이책을 읽을 때 연필을 쥐는 사람이 있습니다. 마음에 드는 문장 아래에 줄을 긋고, 여백에 짧은 생각을 적고, 다시 펼쳐 볼 쪽의 모서리를 접습니다. My Library에서도 같은 일을 할 수 있습니다.</p>
 <h2>문장에 색을 입히기</h2>
 <p>마음에 드는 문장을 길게 눌러 선택하세요. 맥에서는 마우스로 끌어서 선택하면 됩니다. 선택한 곳 가까이에 작은 막대가 나타나고, 거기서 노랑, 초록, 파랑, 분홍 가운데 하나를 고르면 문장에 색이 입혀집니다. 이 문단의 한 줄을 골라 직접 해 보세요.</p>
 <p>색을 입힌 문장을 다시 누르면 색을 바꾸거나, 메모를 달거나, 지울 수 있습니다. 색에 정해진 뜻은 없습니다. 노랑은 좋은 문장, 파랑은 나중에 찾아볼 내용처럼 자기만의 규칙을 정해 두면 다시 읽을 때 훨씬 편합니다.</p>
