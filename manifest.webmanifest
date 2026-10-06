@@ -1,0 +1,20 @@
+{
+  "name": "여백 리더",
+  "short_name": "여백",
+  "description": "EPUB·TXT 전자책을 맥과 갤럭시에서 같은 방식으로 읽는 리더",
+  "lang": "ko",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#F3F4F7",
+  "theme_color": "#F3F4F7",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "file_handlers": [
+    { "action": "./", "accept": { "application/epub+zip": [".epub"], "text/plain": [".txt"] } }
+  ],
+  "launch_handler": { "client_mode": "focus-existing" }
+}
