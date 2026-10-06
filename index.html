@@ -181,6 +181,11 @@ dialog.lib-dlg::backdrop{background:var(--scrim)}
 #content td,#content th{border:1px solid var(--r-rule);padding:.3em .5em}
 #content pre{white-space:pre-wrap;font-size:.85em}
 #content hr{border:0;border-top:1px solid var(--r-rule);margin:1.5em 20%}
+/* on dark pages a see-through tint turns muddy (yellow becomes brown): use a real highlighter there, with dark ink */
+#reader[data-rt="night"]{--hl-yellow:rgba(250,206,40,.86);--hl-green:rgba(112,206,140,.82);--hl-blue:rgba(122,170,255,.82);--hl-pink:rgba(255,135,172,.82);--hl-purple:rgba(182,146,255,.82);--hl-orange:rgba(255,168,88,.84);--hl-ink:#14161B}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]) #reader[data-rt="auto"]{--hl-yellow:rgba(250,206,40,.86);--hl-green:rgba(112,206,140,.82);--hl-blue:rgba(122,170,255,.82);--hl-pink:rgba(255,135,172,.82);--hl-purple:rgba(182,146,255,.82);--hl-orange:rgba(255,168,88,.84);--hl-ink:#14161B} }
+:root[data-theme="dark"] #reader[data-rt="auto"]{--hl-yellow:rgba(250,206,40,.86);--hl-green:rgba(112,206,140,.82);--hl-blue:rgba(122,170,255,.82);--hl-pink:rgba(255,135,172,.82);--hl-purple:rgba(182,146,255,.82);--hl-orange:rgba(255,168,88,.84);--hl-ink:#14161B}
+mark.ann.hl{color:var(--hl-ink,inherit)}
 mark.ann{color:inherit;background:transparent;border-radius:2px;cursor:pointer;-webkit-box-decoration-break:clone;box-decoration-break:clone}
 mark.hl.c-yellow{background:var(--hl-yellow)} mark.hl.c-green{background:var(--hl-green)} mark.hl.c-blue{background:var(--hl-blue)} mark.hl.c-pink{background:var(--hl-pink)} mark.hl.c-purple{background:var(--hl-purple)} mark.hl.c-orange{background:var(--hl-orange)}
 mark.ul{text-decoration:underline;text-decoration-color:var(--ul-red);text-decoration-thickness:2px;text-underline-offset:.24em;text-decoration-skip-ink:none}
