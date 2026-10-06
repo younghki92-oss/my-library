@@ -124,7 +124,7 @@ svg.i{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.7;stro
 .confirm div{display:flex;gap:6px;flex-wrap:wrap;justify-content:center}
 .confirm .btn{padding:6px 12px;font-size:13px}
 .hint{color:var(--muted);font-size:13px;margin-top:40px;line-height:1.6}
-.card-foot .foot-txt{display:inline-flex;align-items:center;gap:6px;min-width:0}
+.card-foot .foot-txt{display:block;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .lib-dlg select{border:1px solid var(--line);border-radius:10px;padding:10px 12px;font:inherit;font-size:14.5px;background:var(--bg);color:var(--ink)}
 .cat-row{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--line);font-size:14.5px}
 .cat-row span.n{flex:1}
@@ -352,6 +352,8 @@ mark.pend{background:var(--hl-yellow);color:inherit;outline:1.5px dashed var(--a
     <button class="side-item" data-view="all"><svg viewBox="0 0 24 24"><path d="M4 4.5h3v15H4zM9 4.5h3v15H9zM14.2 5.2l2.9-.8 3.9 14.5-2.9.8z"/></svg><span class="lbl">전체</span><span class="n" id="nAll"></span></button>
     <button class="side-item" data-view="reading"><svg viewBox="0 0 24 24"><path d="M3 5.5c3-1 6-1 9 1 3-2 6-2 9-1v13c-3-1-6-1-9 1-3-2-6-2-9-1z"/><path d="M12 6.5v13"/></svg><span class="lbl">읽는 중</span><span class="n" id="nReading"></span></button>
     <button class="side-item" data-view="done"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M8 12.3l2.7 2.7L16 9.6"/></svg><span class="lbl">다 읽음</span><span class="n" id="nDone"></span></button>
+    <button class="side-item" data-view="marked"><svg viewBox="0 0 24 24"><path d="M5 19.5h14"/><path d="M14.5 4.5l4 4L9 18H5v-4z"/></svg><span class="lbl">표시한 책</span><span class="n" id="nMarked"></span></button>
+    <button class="side-item" data-view="pdf"><svg viewBox="0 0 24 24"><path d="M7 3.5h7l4 4v13H7z"/><path d="M14 3.5v4h4"/><path d="M9.5 13h5M9.5 16h5"/></svg><span class="lbl">PDF</span><span class="n" id="nPdf"></span></button>
     <p class="side-h">나의 컬렉션</p>
     <div id="colList"></div>
     <button class="side-item add" id="newCol" data-newcol><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg><span class="lbl">새 컬렉션</span></button>
@@ -750,12 +752,24 @@ async function libraryBooks() {
 async function renderLibrary() {
   const raw = await libraryBooks();
   const states = new Map(await Promise.all(raw.map(async b => [b.id, await store.get('state', b.id)])));
+  // highlights, notes and bookmarks per book (including ones still waiting in the old app's record)
+  const legacy = (await store.get('state', 'legacy:seojae'))?.books || {};
+  const marksOf2 = id => {
+    const st = states.get(id), hs = st?.highlights || [];
+    const c = { hl: hs.filter(h => !h.note).length, memo: hs.filter(h => h.note).length, bm: (st?.bookmarks || []).length };
+    const old = isDrive(id) && !st?.legacyDone ? legacy[id.slice(2)] : null;
+    if (old) { const ms = (old.marks || []).filter(m => m && !m.del); c.hl += ms.filter(m => !m.note).length; c.memo += ms.filter(m => m.note).length; c.bm += (old.bmarks || []).filter(b => b && !b.del).length; }
+    return c;
+  };
+  const MK = new Map(raw.map(b => [b.id, marksOf2(b.id)]));
   const all = raw.map(b => displayMeta(b, states.get(b.id)));
   const prog = id => states.get(id)?.progress || 0;
   const inView = {
     all: () => true,
     reading: b => prog(b.id) > 0 && prog(b.id) < 0.98,
     done: b => prog(b.id) >= 0.98,
+    marked: b => { const c = MK.get(b.id); return !b.sample && c && c.hl + c.memo + c.bm > 0; },
+    pdf: b => b.format === 'pdf',
   };
   const col = LIB.view.startsWith('col:') ? COLS.list.find(c => 'col:' + c.id === LIB.view) : null;
   if (LIB.view.startsWith('col:') && !col) LIB.view = 'all';
@@ -763,7 +777,7 @@ async function renderLibrary() {
   const q = LIB.q.trim().toLowerCase();
   let books = all.filter(col ? b => col.books.includes(b.id) : inView[LIB.view]);
   if (q) books = books.filter(b => (b.title + ' ' + (b.author || '') + ' ' + (b.file?.name || '')).toLowerCase().includes(q));
-  $('#viewTitle').textContent = col ? col.name : { all: '전체', reading: '읽는 중', done: '다 읽음' }[LIB.view];
+  $('#viewTitle').textContent = col ? col.name : { all: '전체', reading: '읽는 중', done: '다 읽음', marked: '표시한 책', pdf: 'PDF' }[LIB.view];
   $('#viewActs').innerHTML = col ? '<button class="btn" data-colact="rename">이름 바꾸기</button><button class="btn" data-colact="delete">삭제</button>' : '';
   books.sort((a, b) => (states.get(b.id)?.lastOpened || 0) - (states.get(a.id)?.lastOpened || 0) || (b.addedAt || 0) - (a.addedAt || 0));
   const pctOf = id => Math.round((states.get(id)?.progress || 0) * 100);
@@ -781,7 +795,8 @@ async function renderLibrary() {
   } else cont.innerHTML = '';
 
   $('#count').textContent = `${books.length}권`;
-  const footOf = b => b.sample ? '<span class="badge">예시</span>'
+  const markSummary = id => { const c = MK.get(id); return [c.hl && `하이라이트 ${c.hl}`, c.memo && `메모 ${c.memo}`, c.bm && `책갈피 ${c.bm}`].filter(Boolean).join(' · '); };
+  const footOf = b => LIB.view === 'marked' ? markSummary(b.id) : b.sample ? '<span class="badge">예시</span>'
     : pctOf(b.id) ? pctOf(b.id) + '%'
     : b.source === 'drive' && !b.cached ? '<span class="cloud">☁ Drive</span>' : '새 책';
   $('#grid').innerHTML = books.map(b => `<article class="card" data-id="${esc(b.id)}">
@@ -2366,6 +2381,8 @@ function renderSide(all, inView) {
   $('#nAll').textContent = all.length;
   $('#nReading').textContent = all.filter(inView.reading).length || '';
   $('#nDone').textContent = all.filter(inView.done).length || '';
+  $('#nMarked').textContent = all.filter(inView.marked).length || '';
+  $('#nPdf').textContent = all.filter(inView.pdf).length || '';
   const ids = new Set(all.map(b => b.id));
   $('#colList').innerHTML = COLS.list.map(c => `<button class="side-item" data-view="col:${esc(c.id)}" data-col="${esc(c.id)}">${COL_ICON}<span class="lbl">${esc(c.name)}</span><span class="n">${c.books.filter(x => ids.has(x)).length || ''}</span></button>`).join('');
   $$('#side [data-view]').forEach(x => x.setAttribute('aria-current', x.dataset.view === LIB.view));
