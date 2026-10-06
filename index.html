@@ -87,6 +87,20 @@ svg.i{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.7;stro
 .confirm div{display:flex;gap:6px;flex-wrap:wrap;justify-content:center}
 .confirm .btn{padding:6px 12px;font-size:13px}
 .hint{color:var(--muted);font-size:13px;margin-top:40px;line-height:1.6}
+.filters{display:flex;flex-wrap:wrap;gap:6px;margin:-4px 0 18px}
+.filters button{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:999px;padding:6px 12px;font-size:13px;cursor:pointer;font-variant-numeric:tabular-nums}
+.filters button[aria-pressed="true"]{border-color:var(--ink);box-shadow:inset 0 0 0 1px var(--ink);font-weight:600}
+.filters button.add{color:var(--muted);border-style:dashed}
+.cdot{width:8px;height:8px;border-radius:50%;display:inline-block;flex:none}
+.card-foot .foot-txt{display:inline-flex;align-items:center;gap:6px;min-width:0}
+.lib-dlg select{border:1px solid var(--line);border-radius:10px;padding:10px 12px;font:inherit;font-size:14.5px;background:var(--bg);color:var(--ink)}
+.cat-row{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--line);font-size:14.5px}
+.cat-row span.n{flex:1}
+.cat-row small{color:var(--muted);font-size:12px}
+.swatches{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px}
+.swatches button{width:28px;height:28px;border-radius:50%;border:2px solid transparent;cursor:pointer}
+.swatches button[aria-pressed="true"]{border-color:var(--ink);box-shadow:0 0 0 2px var(--surface) inset}
+.dict-syn{font-size:14px;line-height:1.6;color:var(--r-fg)}
 .drive-chip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:7px 13px;cursor:pointer;font-size:13px;color:var(--ink);white-space:nowrap}
 .drive-chip .dot{width:7px;height:7px;border-radius:50%;background:var(--muted)}
 .drive-chip.ok .dot{background:#3FA66B} .drive-chip.busy .dot{background:var(--accent);animation:blink 1s steps(2) infinite} .drive-chip.err .dot{background:var(--ribbon)}
@@ -273,6 +287,7 @@ mark.pend{background:var(--hl-yellow);color:inherit;outline:1.5px dashed var(--a
   </header>
   <div id="continue"></div>
   <div class="shelf-head"><h2>서재</h2><span id="count"></span></div>
+  <div class="filters" id="filters"></div>
   <div id="grid"></div>
   <p class="hint" id="libHint"></p>
 </section>
@@ -453,6 +468,7 @@ async function loadEpub(buf) {
   const base = dir(opfPath || '');
   const title = byTag(opf, 'title')[0]?.textContent.trim() || '제목 없음';
   const author = byTag(opf, 'creator').map(n => n.textContent.trim()).filter(Boolean).join(', ');
+  const lang = (byTag(opf, 'language')[0]?.textContent || '').trim().toLowerCase().slice(0, 2);
   const manifest = new Map();
   byTag(opf, 'item').forEach(it => manifest.set(it.getAttribute('id'), {
     href: resolve(base, it.getAttribute('href')), type: it.getAttribute('media-type') || '', props: (it.getAttribute('properties') || '').split(/\s+/),
@@ -545,7 +561,7 @@ async function loadEpub(buf) {
     const f = coverItem && file(coverItem.href); if (!f) return null;
     return { buf: await f.async('arraybuffer'), type: coverItem.type || guessMime(coverItem.href) };
   }
-  return { title, author, chapters, toc, getDoc, getHTML, coverData };
+  return { title, author, lang, chapters, toc, getDoc, getHTML, coverData };
 }
 
 function decodeText(buf) {
@@ -650,7 +666,9 @@ async function libraryBooks() {
 async function renderLibrary() {
   const raw = await libraryBooks();
   const states = new Map(await Promise.all(raw.map(async b => [b.id, await store.get('state', b.id)])));
-  const books = raw.map(b => displayMeta(b, states.get(b.id)));
+  const all = raw.map(b => { const st = states.get(b.id); return { ...displayMeta(b, st), cat: catOf(b, st) }; });
+  renderFilters(all);
+  const books = LIB.filter === 'all' ? all : all.filter(b => b.cat.id === LIB.filter);
   books.sort((a, b) => (states.get(b.id)?.lastOpened || 0) - (states.get(a.id)?.lastOpened || 0) || (b.addedAt || 0) - (a.addedAt || 0));
   const pctOf = id => Math.round((states.get(id)?.progress || 0) * 100);
 
@@ -666,7 +684,7 @@ async function renderLibrary() {
       <button class="btn primary" data-open="${esc(last.id)}">${opened ? '이어 읽기' : '읽기 시작'}</button></div></div>`;
   } else cont.innerHTML = '';
 
-  $('#count').textContent = `${books.length}권`;
+  $('#count').textContent = LIB.filter === 'all' ? `${books.length}권` : `${books.length} / ${all.length}권`;
   const footOf = b => b.sample ? '<span class="badge">예시</span>'
     : pctOf(b.id) ? pctOf(b.id) + '%'
     : b.source === 'drive' && !b.cached ? '<span class="cloud">☁ Drive</span>' : '새 책';
@@ -674,7 +692,7 @@ async function renderLibrary() {
     <button class="cover-btn" data-open="${esc(b.id)}" aria-label="${esc(b.title)} 열기">${coverHTML(b)}</button>
     <h3>${esc(b.title)}</h3>
     <div class="bar"><i style="width:${pctOf(b.id)}%"></i></div>
-    <div class="card-foot"><span class="foot-txt">${footOf(b)}</span>
+    <div class="card-foot"><span class="foot-txt">${b.sample ? '' : `<i class="cdot" style="background:${b.cat.color}" title="${esc(b.cat.name)}"></i>`}${footOf(b)}</span>
       <button class="more" data-edit="${esc(b.id)}" aria-label="${esc(b.title)} 정보 고치기">⋯</button></div>
   </article>`).join('') || '<p class="empty">서재가 비어 있어요. ‘책 추가’로 첫 책을 넣어 보세요.</p>';
   $('#libHint').innerHTML = G.on
@@ -683,7 +701,7 @@ async function renderLibrary() {
   updateDriveChip();
   LIB.books = books;
 }
-const LIB = { books: [] };
+const LIB = { books: [], filter: ls.get('yb-filter', 'all') };
 library.addEventListener('click', async e => {
   const t = e.target.closest('button'); if (!t) return;
   if (t.dataset.open) openBook(t.dataset.open);
@@ -696,7 +714,8 @@ function openBookDialog(b) {
   dlg.innerHTML = `<form method="dialog" id="bookForm">
     <h2>책 정보</h2>
     <p class="sub">${drive ? 'Drive 파일: ' + esc(b.file.name) : b.sample ? '앱에 들어 있는 예시 책이에요.' : '이 기기에 추가한 책이에요.'}</p>
-    ${b.sample ? '' : `<label>제목<input id="bTitle" value="${esc(b.title)}"></label><label>저자<input id="bAuthor" value="${esc(b.author || '')}"></label>`}
+    ${b.sample ? '' : `<label>제목<input id="bTitle" value="${esc(b.title)}"></label><label>저자<input id="bAuthor" value="${esc(b.author || '')}"></label>
+      <label>분류<select id="bCat">${CATS.list.map(c => `<option value="${esc(c.id)}" ${c.id === b.cat?.id ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</select></label>`}
     <div class="dlg-acts">
       ${drive ? (b.cached ? '<button class="btn left" value="uncache">받아 둔 파일 지우기</button>' : '') : '<button class="btn danger left" value="delete">서재에서 지우기</button>'}
       <button class="btn" value="cancel">닫기</button>${b.sample ? '' : '<button class="btn primary" value="save">저장</button>'}
@@ -704,13 +723,13 @@ function openBookDialog(b) {
   dlg.onclose = async () => {
     const v = dlg.returnValue;
     if (v === 'save') {
-      const title = $('#bTitle').value.trim() || b.title, author = $('#bAuthor').value.trim();
+      const title = $('#bTitle').value.trim() || b.title, author = $('#bAuthor').value.trim(), cat = $('#bCat').value;
       if (drive) { // edits on Drive books travel with the sync file
         const st = (await store.get('state', b.id)) || { loc: { ch: 0, block: 0 }, highlights: [], bookmarks: [] };
-        Object.assign(st, { title, author, metaAt: Date.now() });
+        Object.assign(st, { title, author, cat, metaAt: Date.now() });
         await store.put('state', b.id, st); queueSync();
       } else {
-        const m = await store.get('books', b.id); if (m) await store.put('books', b.id, { ...m, title, author });
+        const m = await store.get('books', b.id); if (m) await store.put('books', b.id, { ...m, title, author, cat });
       }
       toast('책 정보를 고쳤어요');
     } else if (v === 'delete') {
@@ -1605,6 +1624,7 @@ const LANGS = [['ko', '한국어'], ['en', 'English'], ['fr', 'Français']];
 function detectLang(t) { // the reader's three languages: Korean, English, French
   const ko = (t.match(/[가-힣]/g) || []).length, latin = (t.match(/[A-Za-zÀ-ÿœŒ]/g) || []).length;
   if (ko * 3 >= latin) return 'ko';
+  if (t.trim().split(/\s+/).length <= 2 && ['en', 'fr'].includes(R.book?.lang)) return R.book.lang; // too short to tell: trust the book
   const accents = (t.match(/[àâæçè-ëîïôœùûüÿ]/gi) || []).length;
   const low = ' ' + t.toLowerCase().replace(/[^a-zà-ÿœ']+/g, ' ') + ' ';
   const count = words => words.reduce((n, w) => n + (low.split(' ' + w + ' ').length - 1), 0);
@@ -1680,6 +1700,7 @@ function renderTranslate(arg) {
     try {
       let r = TR.cache.get(key)?.r, via = TR.cache.get(key)?.via;
       if (!r) { r = await translateOnDevice(arg.text, from, to); via = '이 기기의 내장 번역'; }
+      if (!r) { r = await translateRelay(arg.text, from, to); via = 'Google 번역 (내 Apps Script 중계)'; }
       if (!r) { r = await translateMyMemory(arg.text, from, to); via = 'MyMemory 무료 번역 (선택한 글이 MyMemory로 보내져요)'; }
       TR.cache.set(key, { r, via });
       if (out !== $('#trOut')) return;
@@ -1695,22 +1716,103 @@ function renderTranslate(arg) {
   })();
 }
 
+/* --- relay: the reader's own Apps Script web app (standard Korean dictionary, Merriam-Webster, translation) --- */
+const DEFAULT_RELAY = 'https://script.google.com/macros/s/AKfycbzxSzcrBdjXlknlexmq87owcLLmR-p5fj4NChwn46lUD1GZlGc6Xf0UwEU-sLL9PU-M/exec';
+const RELAY = { url: ls.get('yb-relay', DEFAULT_RELAY), tr: null };
+function fetchT(url, ms = 7000) {
+  const c = new AbortController(), t = setTimeout(() => c.abort(), ms);
+  return fetch(url, { signal: c.signal }).finally(() => clearTimeout(t));
+}
+async function relay(src, params) {
+  if (!RELAY.url) throw new Error('no relay');
+  const r = await fetchT(RELAY.url + '?' + new URLSearchParams({ src, ...params }));
+  if (!r.ok) throw new Error('relay ' + r.status);
+  return r.json();
+}
+async function translateRelay(text, from, to) {
+  if (!RELAY.url || RELAY.tr === false) return null;
+  try {
+    const parts = [];
+    for (const c of chunkText(text, 1500)) {
+      if (!c.trim()) { parts.push(c); continue; }
+      const j = await relay('tr', { q: c, sl: from, tl: to });
+      if (!j || typeof j.text !== 'string') { RELAY.tr = false; return null; } // the relay has no translate branch yet
+      parts.push(j.text);
+    }
+    RELAY.tr = true;
+    return parts.join(' ').trim();
+  } catch { return null; }
+}
+
 /* --- dictionary --- */
-const JOSA = /(에서부터|으로부터|에게서|한테서|으로써|이라는|에서|에게|한테|까지|부터|처럼|보다|으로|이나|이며|이고|라는|은|는|이|가|을|를|에|의|로|와|과|도|만|나)$/;
+const KO_TAILS = ['으로부터', '에게서', '로부터', '이라고', '라고', '에서', '에게', '한테', '까지', '부터', '으로', '이나', '처럼', '보다', '마다', '조차', '밖에',
+  '이라', '하고', '와의', '과의', '에는', '에도', '을', '를', '은', '는', '이', '가', '의', '에', '도', '만', '로', '와', '과', '나', '랑', '야'];
+function koForms(w) { // 책을 → 책, 사랑에서 → 사랑
+  const out = [w];
+  for (const t of KO_TAILS) if (w.length > t.length && w.endsWith(t)) { const b = w.slice(0, -t.length); if (b && !out.includes(b)) out.push(b); }
+  return out.slice(0, 5);
+}
+function enForms(w) { // running → run, studies → study
+  const l = w.toLowerCase(), out = [l], add = x => { if (x && x.length > 2 && !out.includes(x)) out.push(x); };
+  if (l.endsWith('ies')) add(l.slice(0, -3) + 'y');
+  if (l.endsWith('es')) add(l.slice(0, -2));
+  if (l.endsWith('s')) add(l.slice(0, -1));
+  if (l.endsWith('ied')) add(l.slice(0, -3) + 'y');
+  if (l.endsWith('ing')) { const st = l.slice(0, -3); add(st); add(st + 'e'); if (st.length > 2 && st.at(-1) === st.at(-2)) add(st.slice(0, -1)); }
+  if (l.endsWith('ed')) { const st = l.slice(0, -2); add(st); add(l.slice(0, -1)); if (st.length > 2 && st.at(-1) === st.at(-2)) add(st.slice(0, -1)); }
+  if (l.endsWith('ly')) add(l.slice(0, -2));
+  return out.slice(0, 6);
+}
+function fmtStdict(j, w) { // 표준국어대사전 → [{head, pos, defs}]
+  const items = j?.channel?.item || [];
+  return items.slice(0, 6).map(it => {
+    const senses = (Array.isArray(it.sense) ? it.sense : [it.sense]).filter(Boolean);
+    return { head: (it.word || w).replace(/[\^-]/g, '') + (it.sup_no && it.sup_no !== '0' ? ' ' + it.sup_no : ''), pos: it.pos || '', defs: senses.slice(0, 4).map(x => ({ d: x.definition })).filter(x => x.d) };
+  }).filter(e => e.defs.length);
+}
+function fmtMW(j) { // Merriam-Webster collegiate → [{head, pos, defs}]
+  if (!Array.isArray(j) || !j.length || typeof j[0] === 'string') return [];
+  return j.slice(0, 4).filter(en => en.shortdef?.length).map(en => ({
+    head: (en.hwi?.hw || '').replace(/\*/g, '·') + (en.hwi?.prs?.[0]?.mw ? `  /${en.hwi.prs[0].mw}/` : ''),
+    pos: en.fl || '', defs: en.shortdef.slice(0, 4).map(d => ({ d })),
+  }));
+}
+function fmtMWTh(j) {
+  if (!Array.isArray(j) || !j.length || typeof j[0] === 'string') return null;
+  const syn = [], ant = [];
+  j.slice(0, 2).forEach(en => {
+    (en.meta?.syns || []).forEach(g => g.slice(0, 8).forEach(x => { if (!syn.includes(x)) syn.push(x); }));
+    (en.meta?.ants || []).forEach(g => g.slice(0, 6).forEach(x => { if (!ant.includes(x)) ant.push(x); }));
+  });
+  return syn.length || ant.length ? { syn: syn.slice(0, 12), ant: ant.slice(0, 8) } : null;
+}
 const htmlText = h => { const d = document.createElement('div'); d.innerHTML = h || ''; return d.textContent.trim(); };
 async function wiktionary(word) {
-  const r = await fetch(`https://en.wiktionary.org/api/rest_v1/page/definition/${encodeURIComponent(word)}`);
+  const r = await fetchT(`https://en.wiktionary.org/api/rest_v1/page/definition/${encodeURIComponent(word)}`);
   if (r.status === 404) return null;
   if (!r.ok) throw new Error('http ' + r.status);
   return r.json();
 }
+function fmtWikt(data, lang) {
+  const keys = [lang, ...Object.keys(data || {}).filter(k => k !== lang)].filter(k => data?.[k]?.length).slice(0, 2);
+  return keys.flatMap(k => data[k].slice(0, 4).map(en => ({
+    head: en.language, pos: en.partOfSpeech,
+    defs: en.definitions.map(d => ({ d: htmlText(d.definition), ex: htmlText(d.parsedExamples?.[0]?.example || d.examples?.[0] || '') })).filter(d => d.d).slice(0, 5),
+  }))).filter(e => e.defs.length);
+}
+// try each form of the word at once; keep the earliest form (closest to what was selected) that has entries
+async function firstHit(forms, look) {
+  const res = await Promise.all(forms.map(f => look(f).then(r => r, () => null)));
+  const i = res.findIndex(r => r && r.length);
+  return i < 0 ? null : { form: forms[i], entries: res[i] };
+}
 function renderDict(arg) {
-  const raw = arg.text.replace(/^[\s"'“‘(\[「『]+|[\s"'”’)\]」』.,!?。？！…:;]+$/g, '');
+  const raw = arg.text.replace(/^[\s"'“‘(\[「『]+|[\s"'”’)\]」』.,!?。？！…:;]+$/g, '').split(/\s+/)[0] || arg.text.trim();
   const lang = detectLang(raw);
   const word = lang === 'en' ? raw.toLowerCase() : raw, q = encodeURIComponent(word);
-  const naver = `https://${lang}.dict.naver.com/#/search?query=${q}`;
-  const links = `<a href="${naver}" target="_blank" rel="noopener">네이버 사전</a>`
+  const links = `<a href="https://${lang}.dict.naver.com/#/search?query=${q}" target="_blank" rel="noopener">네이버 사전</a>`
     + (lang === 'ko' ? `<a href="https://stdict.korean.go.kr/search/searchResult.do?searchKeyword=${q}" target="_blank" rel="noopener">표준국어대사전</a>` : '')
+    + (lang === 'en' ? `<a href="https://www.merriam-webster.com/dictionary/${q}" target="_blank" rel="noopener">Merriam-Webster</a>` : '')
     + `<a href="https://en.wiktionary.org/wiki/${q}" target="_blank" rel="noopener">위키낱말사전</a>`;
   body().innerHTML = `<div class="dict-word">${esc(word)}</div><div id="dictOut"><p class="tool-src">찾는 중…</p></div>
     <p class="tool-sub">더 찾아보기</p><div class="tool-acts">${links}</div>`;
@@ -1718,28 +1820,113 @@ function renderDict(arg) {
   body().onclick = e => { if (e.target.closest('[data-save]') && summary) noteOn(arg, `[사전 · ${word}]\n${summary}`); };
   const out = $('#dictOut');
   (async () => {
-    try {
-      let data = await wiktionary(word), shown = word;
-      const base = lang === 'ko' ? word.replace(JOSA, '') : word;
-      if ((!data || !data[lang]) && base && base !== word) { const d2 = await wiktionary(base); if (d2) { data = d2; shown = base; } }
-      if (out !== $('#dictOut')) return;
-      const groups = [lang, ...Object.keys(data || {}).filter(k => k !== lang)].filter(k => data?.[k]?.length).slice(0, 2);
-      if (!groups.length) { out.innerHTML = `<p class="empty">위키낱말사전에 ‘${esc(word)}’ 항목이 없어요. 아래 네이버 사전에서 찾아보세요.</p>`; return; }
-      const lines = [];
-      out.innerHTML = (shown !== word ? `<p class="tool-src">‘${esc(shown)}’(으)로 찾은 결과예요.</p>` : '') + groups.map(k => {
-        const entries = data[k];
-        return `<div class="dict-lang">${esc(entries[0].language)}</div>` + entries.slice(0, 4).map(en => {
-          const defs = en.definitions.map(d => ({ d: htmlText(d.definition), ex: htmlText(d.parsedExamples?.[0]?.example || d.examples?.[0] || '') })).filter(d => d.d).slice(0, 5);
-          defs.forEach(d => lines.push(`${en.partOfSpeech}: ${d.d}`));
-          return `<span class="dict-pos">${esc(en.partOfSpeech)}</span><ol class="dict-defs">${defs.map(d => `<li>${esc(d.d)}${d.ex ? `<small>${esc(d.ex)}</small>` : ''}</li>`).join('')}</ol>`;
-        }).join('');
-      }).join('') + `<p class="tool-src">출처: 위키낱말사전(Wiktionary 영어판)</p><div class="tool-acts"><button data-save>메모로 저장</button></div>`;
-      summary = lines.slice(0, 6).join('\n');
-    } catch {
-      if (out !== $('#dictOut')) return;
-      out.innerHTML = '<p class="empty">사전 서비스에 연결하지 못했어요. 인터넷 연결을 확인하거나 아래 네이버 사전을 눌러 주세요.</p>';
+    let hit = null, source = '', thes = null;
+    if (RELAY.url && lang === 'ko') { hit = await firstHit(koForms(word), w => relay('stdict', { q: w }).then(j => fmtStdict(j, w))); source = '표준국어대사전'; }
+    if (RELAY.url && lang === 'en') {
+      const forms = enForms(word);
+      [hit, thes] = await Promise.all([
+        firstHit(forms, w => relay('mw', { q: w }).then(fmtMW)),
+        relay('mwth', { q: forms[0] }).then(fmtMWTh, () => null),
+      ]);
+      source = 'Merriam-Webster';
     }
+    if (!hit) {
+      const forms = lang === 'ko' ? koForms(word) : lang === 'en' ? enForms(word) : [word, word.toLowerCase()].filter((x, i, a) => a.indexOf(x) === i);
+      hit = await firstHit(forms, w => wiktionary(w).then(d => fmtWikt(d, lang)));
+      source = '위키낱말사전(Wiktionary 영어판)';
+    }
+    if (out !== $('#dictOut')) return;
+    if (!hit) { out.innerHTML = `<p class="empty">‘${esc(word)}’을(를) 사전에서 찾지 못했어요. 아래 링크에서 찾아보세요.</p>`; return; }
+    const lines = [];
+    out.innerHTML = (hit.form !== word ? `<p class="tool-src">‘${esc(word)}’ → ‘${esc(hit.form)}’(으)로 찾았어요.</p>` : '')
+      + hit.entries.map(en => {
+        en.defs.forEach(d => lines.push(`${en.pos ? en.pos + ': ' : ''}${d.d}`));
+        return `<div class="dict-lang">${esc(en.head)}</div>${en.pos ? `<span class="dict-pos">${esc(en.pos)}</span>` : ''}<ol class="dict-defs">${en.defs.map(d => `<li>${esc(d.d)}${d.ex ? `<small>${esc(d.ex)}</small>` : ''}</li>`).join('')}</ol>`;
+      }).join('')
+      + (thes ? `<div class="dict-lang">비슷한 말 · 반대말</div><p class="dict-syn">${thes.syn.length ? '≈ ' + esc(thes.syn.join(', ')) : ''}${thes.ant.length ? '<br>↔ ' + esc(thes.ant.join(', ')) : ''}</p>` : '')
+      + `<p class="tool-src">출처: ${source}</p><div class="tool-acts"><button data-save>메모로 저장</button></div>`;
+    summary = lines.slice(0, 6).join('\n');
   })();
+}
+
+/* ================= categories ================= */
+// The reader's own shelves, with words that sort books automatically by file name or title.
+const CAT_PALETTE = ['#6E8FB8', '#8A7BB8', '#C8A45C', '#6FA58C', '#B87B8A', '#7E8A97', '#C97B54', '#5FA3B5', '#A8B86E', '#B8628A'];
+const DEFAULT_CATS = [
+  { id: 'comm', name: '성경주석', color: '#6E8FB8', kw: ['주석', '강해', 'commentary', 'exegetical', 'wbc', 'nicnt', 'nicot', 'nigtc', 'becnt', 'icc', 'pillar', 'word biblical', 'anchor bible', 'tyndale', '틴델'] },
+  { id: 'theo', name: '신학', color: '#8A7BB8', kw: ['신학', 'theology', 'theological', 'doctrine', 'dogmatic', '조직신학', '교의', 'systematic', '기독론', '구원론', '교회론', '변증'] },
+  { id: 'serm', name: '설교', color: '#C8A45C', kw: ['설교', 'sermon', 'preaching', '강단', 'homilet'] },
+  { id: 'past', name: '목회·사역', color: '#6FA58C', kw: ['목회', '사역', 'ministry', 'pastoral', '리더십', 'leadership', '제자훈련', '상담'] },
+  { id: 'devo', name: '영성·경건', color: '#B87B8A', kw: ['영성', '경건', '묵상', '기도', 'devotional', 'spiritual', 'prayer', '큐티'] },
+  { id: 'gen', name: '일반', color: '#7E8A97', kw: [] },
+];
+const CATS = Object.assign({ at: 0, list: DEFAULT_CATS }, ls.get('yb-cats', {}));
+function saveCats() { CATS.at = Date.now(); ls.set('yb-cats', CATS); queueSync(); }
+function catOf(b, st) {
+  const pick = id => CATS.list.find(c => c.id === id);
+  const own = pick(st?.cat || b.cat); if (own) return own;
+  const hay = ((b.file?.name || '') + ' ' + (b.title || '')).toLowerCase();
+  // longest keyword wins; on a tie, the one that appears first ("설교의" → 설교, not 교의)
+  let best = null, len = 0, at = Infinity;
+  for (const c of CATS.list) for (const k of c.kw || []) {
+    const kk = String(k).toLowerCase(), i = kk ? hay.indexOf(kk) : -1;
+    if (i >= 0 && (kk.length > len || (kk.length === len && i < at))) { best = c; len = kk.length; at = i; }
+  }
+  return best || CATS.list[CATS.list.length - 1] || { id: 'gen', name: '일반', color: '#7E8A97' };
+}
+function renderFilters(all) {
+  const el = $('#filters'); if (!el) return;
+  const books = all.filter(b => !b.sample), counts = {};
+  books.forEach(b => { counts[b.cat.id] = (counts[b.cat.id] || 0) + 1; });
+  if (LIB.filter !== 'all' && !counts[LIB.filter]) LIB.filter = 'all';
+  if (!books.length) { el.innerHTML = ''; return; }
+  el.innerHTML = `<button data-filter="all" aria-pressed="${LIB.filter === 'all'}">전체 ${books.length}</button>`
+    + CATS.list.filter(c => counts[c.id]).map(c => `<button data-filter="${esc(c.id)}" aria-pressed="${LIB.filter === c.id}"><i class="cdot" style="background:${c.color}"></i>${esc(c.name)} ${counts[c.id]}</button>`).join('')
+    + '<button class="add" data-cats>분류 관리</button>';
+}
+$('#filters').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  if (b.dataset.filter) { LIB.filter = b.dataset.filter; ls.set('yb-filter', LIB.filter); renderLibrary(); }
+  else if ('cats' in b.dataset) openCatsDialog();
+});
+function openCatsDialog() {
+  const dlg = $('#libDlg');
+  dlg.innerHTML = `<form method="dialog"><h2>분류 관리</h2>
+    <p class="sub">파일 이름이나 제목에 자동 분류 단어가 들어 있으면 그 분류로 정리돼요. 책마다 ‘⋯ → 책 정보’에서 직접 바꿀 수도 있어요.</p>
+    ${CATS.list.map(c => `<div class="cat-row"><i class="cdot" style="background:${c.color}"></i><span class="n">${esc(c.name)} <small>${(c.kw || []).length ? '자동 단어 ' + c.kw.length + '개' : ''}</small></span><button class="btn" value="edit:${esc(c.id)}">고치기</button></div>`).join('')}
+    <div class="dlg-acts" style="margin-top:16px"><button class="btn left" value="add">분류 추가</button><button class="btn primary" value="close">닫기</button></div></form>`;
+  dlg.onclose = () => {
+    const v = dlg.returnValue || '';
+    if (v === 'add') openCatEdit(null);
+    else if (v.startsWith('edit:')) openCatEdit(CATS.list.find(c => c.id === v.slice(5)));
+    else renderLibrary();
+  };
+  dlg.showModal();
+}
+function openCatEdit(c) {
+  const dlg = $('#libDlg'), isNew = !c;
+  let color = c?.color || CAT_PALETTE[CATS.list.length % CAT_PALETTE.length];
+  dlg.innerHTML = `<form method="dialog"><h2>${isNew ? '분류 추가' : '분류 고치기'}</h2>
+    <label>이름<input id="cName" value="${esc(c?.name || '')}" placeholder="예: 조직신학"></label>
+    <label>색</label><div class="swatches">${CAT_PALETTE.map(p => `<button type="button" data-color="${p}" style="background:${p}" aria-label="${p}" aria-pressed="${p === color}"></button>`).join('')}</div>
+    <label>자동 분류 단어 (쉼표로 구분, 비워도 돼요)<input id="cKw" value="${esc((c?.kw || []).join(', '))}" placeholder="예: 조직신학, systematic, dogmatic"></label>
+    <div class="dlg-acts">${!isNew && CATS.list.length > 1 ? '<button class="btn danger left" value="del">삭제</button>' : ''}<button class="btn" value="cancel">취소</button><button class="btn primary" value="save">저장</button></div></form>`;
+  dlg.querySelector('.swatches').onclick = e => {
+    const b = e.target.closest('[data-color]'); if (!b) return;
+    color = b.dataset.color; dlg.querySelectorAll('.swatches button').forEach(x => x.setAttribute('aria-pressed', x === b));
+  };
+  dlg.onclose = () => {
+    const v = dlg.returnValue;
+    if (v === 'save') {
+      const name = $('#cName').value.trim() || '이름 없는 분류', kw = $('#cKw').value.split(/[,，]/).map(x => x.trim()).filter(Boolean);
+      CATS.list = CATS.list.map(x => ({ ...x }));
+      if (isNew) CATS.list.splice(Math.max(0, CATS.list.length - 1), 0, { id: uid('c'), name, color, kw });
+      else Object.assign(CATS.list.find(x => x.id === c.id), { name, color, kw });
+      saveCats();
+    } else if (v === 'del') { CATS.list = CATS.list.filter(x => x.id !== c.id); saveCats(); }
+    openCatsDialog();
+  };
+  dlg.showModal();
 }
 
 /* ================= Google Drive: library folder + sync ================= */
@@ -1851,7 +2038,7 @@ function mergeBook(a, b) {
   return {
     loc: pos.loc, locAt: pos.locAt || 0, progress: pos.progress || 0, total: a.total || b.total || 0,
     lastOpened: Math.max(a.lastOpened || 0, b.lastOpened || 0),
-    title: meta.title, author: meta.author, metaAt: meta.metaAt || 0,
+    title: meta.title, author: meta.author, cat: meta.cat, metaAt: meta.metaAt || 0,
     highlights: mergeItems(a.highlights, b.highlights, tomb), bookmarks: mergeItems(a.bookmarks, b.bookmarks, tomb),
     tomb: [...tomb].map(([id, mt]) => ({ id, mt })).sort((p, q) => (p.id < q.id ? -1 : 1)),
   };
@@ -1875,10 +2062,10 @@ function syncNow() {
       const lr = await gapi(`https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=${q}&fields=files(id,modifiedTime)&orderBy=modifiedTime desc`);
       if (!lr.ok) throw new Error('sync list ' + lr.status);
       const files = (await lr.json()).files || [];
-      let remote = { books: {} };
+      let remote = { books: {} }, rcats = null;
       for (const f of files) {
         const r = await gapi(`https://www.googleapis.com/drive/v3/files/${f.id}?alt=media`);
-        if (r.ok) { try { remote = mergeAll(remote, await r.json()); } catch {} }
+        if (r.ok) { try { const j = await r.json(); remote = mergeAll(remote, j); if (j.cats && (!rcats || j.cats.at > rcats.at)) rcats = j.cats; } catch {} }
       }
       const merged = mergeAll({ books: local }, remote);
       for (const [k, v] of Object.entries(merged.books)) {
@@ -1886,8 +2073,10 @@ function syncNow() {
         await store.put('state', k, v);
         if (R.book && R.id === k) applyRemoteState(v);
       }
-      if (!files.length || canon(merged.books) !== canon(remote.books)) {
-        const blob = new Blob([JSON.stringify({ v: 1, updated: Date.now(), books: merged.books })], { type: 'application/json' });
+      const catsChanged = rcats && rcats.at > CATS.at;
+      if (catsChanged) { Object.assign(CATS, rcats); ls.set('yb-cats', CATS); if (reader.hidden) renderLibrary(); }
+      if (!files.length || canon(merged.books) !== canon(remote.books) || (!rcats ? CATS.at > 0 : CATS.at > rcats.at)) {
+        const blob = new Blob([JSON.stringify({ v: 1, updated: Date.now(), books: merged.books, cats: CATS.at ? CATS : undefined })], { type: 'application/json' });
         let w;
         if (files[0]) w = await gapi(`https://www.googleapis.com/upload/drive/v3/files/${files[0].id}?uploadType=media`, { method: 'PATCH', body: blob });
         else {
@@ -1936,7 +2125,9 @@ function openDriveDialog() {
     <p class="sub">책 폴더에서 EPUB·TXT ${n}권을 찾았어요.${G.lastSync ? ' 마지막으로 맞춘 때: ' + new Date(G.lastSync).toLocaleString('ko-KR') : ''}${G.err ? '<br>최근 오류: ' + esc(G.err.message) : ''}</p>
     <label>책 폴더 ID<input id="gFid" value="${esc(G.fid)}" spellcheck="false" autocomplete="off">
       <small>Drive에서 책 폴더를 열었을 때 주소의 <b>folders/</b> 뒤에 오는 글자예요. 하위 폴더까지 모두 찾아요.</small></label>
-    <details><summary>고급 설정</summary><label>OAuth 클라이언트 ID<input id="gCid" value="${esc(G.cid)}" spellcheck="false" autocomplete="off"></label></details>
+    <details><summary>고급 설정</summary><label>OAuth 클라이언트 ID<input id="gCid" value="${esc(G.cid)}" spellcheck="false" autocomplete="off"></label>
+      <label>사전 중계 주소 (Apps Script)<input id="gRelay" value="${esc(RELAY.url)}" spellcheck="false" autocomplete="off">
+      <small>표준국어대사전·Merriam-Webster 사전과 번역에 써요.</small></label></details>
     <div class="dlg-acts">
       <button class="btn left" value="off">연결 해제</button>
       <button class="btn" value="sync">지금 맞추기</button>
@@ -1948,6 +2139,7 @@ function openDriveDialog() {
     else if (v === 'sync') { await syncNow(); await scanDrive(); toast(G.err ? '맞추지 못했어요: ' + G.err.message : '다른 기기와 맞췄어요'); }
     else if (v === 'save') {
       const fid = $('#gFid').value.trim().replace(/^.*folders\//, '').replace(/[?#].*$/, ''), cid = $('#gCid').value.trim();
+      const relay = $('#gRelay').value.trim(); if (relay !== RELAY.url) { RELAY.url = relay; RELAY.tr = null; ls.set('yb-relay', relay); }
       if (cid && cid !== G.cid) { G.cid = cid; ls.set('yb-g-cid', cid); G.client = null; G.token = null; }
       if (fid) { G.fid = fid; ls.set('yb-g-fid', fid); }
       await scanDrive();
