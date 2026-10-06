@@ -307,6 +307,7 @@ mark.pend{background:var(--hl-yellow);color:inherit;outline:1.5px dashed var(--a
 /* touch: the reader does its own selection (no Android selection toolbar) */
 #reader.touchsel #content{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
 #reader.touchsel.tsel-on #content{-webkit-user-select:text;user-select:text}
+.tsel-rect{position:fixed;z-index:5;background:rgba(66,133,244,.30);border-radius:2px;pointer-events:none}
 .lp-hint{position:fixed;z-index:6;background:var(--accent-soft);outline:2px solid var(--accent);border-radius:3px;pointer-events:none;animation:fade .12s}
 #pop{position:fixed;z-index:31;width:min(380px,calc(100vw - 24px));max-height:min(52vh,460px);display:flex;flex-direction:column;background:var(--r-panel);color:var(--r-fg);border:1px solid var(--r-rule);border-radius:14px;box-shadow:0 12px 36px rgba(0,0,0,.28);animation:fade .15s;box-sizing:border-box}
 #pop[data-side]::before{content:"";position:absolute;top:calc(var(--ay,40px) - 8px);width:15px;height:15px;background:var(--r-panel);border:1px solid var(--r-rule);transform:rotate(45deg)}
@@ -973,7 +974,7 @@ function cardStatus(id, text) {
 }
 function closeReader() {
   if (!R.book) return;
-  cancelExtend(); hideHandles(); closePop(); saveNow(); closeSheet(); hideSelbar();
+  cancelExtend(); hideHandles(); closePop(); clearSel(); saveNow(); closeSheet(); hideSelbar();
   R.book = null; reader.hidden = true; library.hidden = false;
   releaseWake(); renderLibrary();
 }
@@ -1001,6 +1002,7 @@ async function indexBook(book) {
 /* ================= rendering & pagination ================= */
 let renderToken = 0;
 async function renderChapter(ch, target = {}, animate = true) {
+  if (TS.range) clearSel();
   if (R.book?.isPdf) return renderPdf(ch, target, animate);
   const tok = ++renderToken;
   ch = clamp(ch, 0, R.book.chapters.length - 1);
@@ -1091,9 +1093,9 @@ function goPage(p, animate = true) {
   content.style.transform = `translate3d(${-R.page * R.step}px,0,0)`;
   afterMove();
 }
-function afterMove() { if (!R.relaying) R.anchor = currentAnchor(); if (R.edit) positionHandles(); updateChrome(); scheduleSave(); }
+function afterMove() { if (!R.relaying) R.anchor = currentAnchor(); if (TS.range) paintTsel(); if (R.edit) positionHandles(); updateChrome(); scheduleSave(); }
 async function next() {
-  hideSelbar(); hideHandles(); closePop();
+  hideSelbar(); hideHandles(); closePop(); clearSel();
   if (R.book.isPdf) return pdfTurn(1);
   const last = R.ch >= R.book.chapters.length - 1;
   if (S.mode === 'paged') {
@@ -1108,7 +1110,7 @@ async function next() {
   reader.classList.add('ui-hidden');
 }
 async function prev() {
-  hideSelbar(); hideHandles(); closePop();
+  hideSelbar(); hideHandles(); closePop(); clearSel();
   if (R.book.isPdf) return pdfTurn(-1);
   if (S.mode === 'paged') {
     if (R.page > 0) goPage(R.page - 1);
@@ -1271,14 +1273,14 @@ function addAnnotation(kind, color, s, e) {
 }
 function createAnnotation(kind, color = 'yellow') {
   if (R.book?.isPdf) {
-    const rects = pdfRectsFromSelection(), text = getSelection().toString();
+    const rects = pdfRectsFromSelection(), text = selText();
     if (!rects) { toast('PDF의 글자를 선택해 주세요'); return null; }
-    getSelection().removeAllRanges();
+    clearSel();
     return addPdfAnnotation(kind, color, rects, text);
   }
   const p = selectionPos();
   if (!p) { toast('본문 문장을 선택해 주세요'); return null; }
-  getSelection().removeAllRanges();
+  clearSel();
   return addAnnotation(kind, color, p.s, p.e);
 }
 function refreshMarks(h) { marksOf(h.id).forEach(m => { m.className = markClass(h); }); }
@@ -1303,7 +1305,7 @@ let hdrag = null;
 function annRects(id) { const out = []; for (const m of marksOf(id)) for (const r of m.getClientRects()) if (r.width) out.push(r); return out; }
 function positionHandles() {
   if (!R.edit || (!R.edit.sel && findH(R.edit.id)?.pdf)) { hS.hidden = hE.hidden = true; return; } // PDF marks have no drag handles
-  const rs = R.edit.sel ? (getSelection().rangeCount ? [...getSelection().getRangeAt(0).getClientRects()].filter(r => r.width) : []) : annRects(R.edit.id), pr = page.getBoundingClientRect();
+  const rs = R.edit.sel ? [...(curRange()?.getClientRects() || [])].filter(r => r.width) : annRects(R.edit.id), pr = page.getBoundingClientRect();
   const vis = r => r && r.right > pr.left - 2 && r.left < pr.right + 2 && r.bottom > pr.top && r.top < pr.bottom;
   const place = (el, r, x) => {
     if (hdrag && el === hdrag.el) return; // the dragged one follows the finger
@@ -1341,14 +1343,15 @@ function dragStep(d = hdrag) {
   if (!d) return; d.raf = 0;
   const c = caretAt(d.x, d.y); if (!c || !content.contains(c.node)) return;
   if (d.sel) { // move one end of the selection, keeping the other where it is
-    const sel = getSelection(); if (!sel.rangeCount) return;
-    const r = sel.getRangeAt(0), nr = document.createRange();
+    const r = curRange(); if (!r) return;
+    const nr = document.createRange();
     try {
       if (d.which === 'e') { nr.setStart(r.startContainer, r.startOffset); nr.setEnd(c.node, c.offset); }
       else { nr.setStart(c.node, c.offset); nr.setEnd(r.endContainer, r.endOffset); }
     } catch { return; }
     if (nr.collapsed) return;
-    sel.removeAllRanges(); sel.addRange(nr); positionHandles();
+    if (TS.range) { TS.range = nr; paintTsel(); } else { const sel = getSelection(); sel.removeAllRanges(); sel.addRange(nr); }
+    positionHandles();
     return;
   }
   const p = rangeToPos(c.node, c.offset), h = d.h; if (!p) return;
@@ -1381,7 +1384,7 @@ function endDrag() {
   if (d.raf) { cancelAnimationFrame(d.raf); dragStep(d); } // apply the final finger position
   hdrag = null;
   reader.classList.remove('dragging');
-  if (d.sel) { const sel = getSelection(); if (sel.rangeCount) { positionHandles(); showSelbar(visibleRect(sel.getRangeAt(0)), 'new'); } return; }
+  if (d.sel) { const r = curRange(); if (r) { positionHandles(); showSelbar(visibleRect(r), 'new'); } return; }
   d.h.text = rangeText(d.h.s, d.h.e); saveNow();
   editAnnotation(d.h.id);
 }
@@ -1398,7 +1401,7 @@ function onSelection() {
     if (has) { const r = s.getRangeAt(0), a = rangeToPos(r.startContainer, r.startOffset), b = rangeToPos(r.endContainer, r.endOffset); s.removeAllRanges(); if (a && b) finishExtend(a, b, false); }
     return;
   }
-  if (!has) { if (selbar.dataset.mode === 'new') hideSelbar(); endTouchSelect(); return; }
+  if (!has) { if (!TS.range && selbar.dataset.mode === 'new') hideSelbar(); return; }
   if (hdrag) return;
   if (R.edit?.sel) positionHandles(); else hideHandles();
   showSelbar(visibleRect(s.getRangeAt(0)), 'new');
@@ -1416,14 +1419,44 @@ function pointsToRange(s, e) {
   const sp = posToPoint(s), ep = posToPoint(e); if (!sp || !ep) return null;
   const r = document.createRange(); r.setStart(sp.node, sp.offset); r.setEnd(ep.node, ep.offset); return r;
 }
+/* On touch screens the browser's own selection is never used (Android would add its own handles
+   and menu, and take the gesture away). The reader keeps the range itself and paints it. */
+const TS = { range: null, rects: [] };
+function curRange() {
+  if (TS.range) return TS.range;
+  const sel = getSelection();
+  return sel.rangeCount && !sel.isCollapsed ? sel.getRangeAt(0) : null;
+}
+const selText = () => curRange()?.toString() || '';
+function paintTsel() {
+  TS.rects.forEach(d => d.remove()); TS.rects = [];
+  if (!TS.range) return;
+  for (const x of TS.range.getClientRects()) {
+    if (!x.width) continue;
+    const d = Object.assign(document.createElement('div'), { className: 'tsel-rect' });
+    Object.assign(d.style, { left: x.left + 'px', top: x.top + 'px', width: x.width + 'px', height: x.height + 'px' });
+    document.body.appendChild(d); TS.rects.push(d);
+  }
+}
+function setTouchRange(r) {
+  TS.range = r; paintTsel(); closePop();
+  R.edit = { sel: true }; positionHandles();
+  showSelbar(visibleRect(r), 'new');
+}
+function clearSel() {
+  if (TS.range) { TS.range = null; paintTsel(); }
+  if (R.edit?.sel) { R.edit = null; positionHandles(); }
+  const sel = getSelection(); if (sel.rangeCount) sel.removeAllRanges();
+}
 function selectionPos() {
-  const sel = getSelection(); if (!sel.rangeCount || sel.isCollapsed) return null;
-  const r = sel.getRangeAt(0), s = rangeToPos(r.startContainer, r.startOffset), e = rangeToPos(r.endContainer, r.endOffset);
+  const r = curRange(); if (!r) return null;
+  const s = rangeToPos(r.startContainer, r.startOffset), e = rangeToPos(r.endContainer, r.endOffset);
   return s && e ? { s, e } : null;
 }
 function selectPos(s, e) {
   const r = pointsToRange(s, e); if (!r) return;
-  const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r);
+  if (coarse) setTouchRange(r);
+  else { const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); }
   const last = [...r.getClientRects()].filter(x => x.width).pop();
   if (S.mode === 'paged' && last && pageOfX(last.left - content.getBoundingClientRect().left) > R.page) toast('다음 쪽까지 이어서 선택했어요. 색을 고르세요.');
 }
@@ -1451,7 +1484,7 @@ function expandParagraph() {
 function startExtend(hid) {
   let s0, e0, color = 'yellow';
   if (hid) { const h = findH(hid); if (!h) return; ({ s: s0, e: e0, color } = h); hideHandles(); }
-  else { const p = selectionPos(); if (!p) return toast('본문 문장을 선택해 주세요'); ({ s: s0, e: e0 } = p); getSelection().removeAllRanges(); }
+  else { const p = selectionPos(); if (!p) return toast('본문 문장을 선택해 주세요'); ({ s: s0, e: e0 } = p); clearSel(); }
   R.ext = { ch: R.ch, s0, e0, hid, color, marks: [] };
   paintPending();
   $('#extHint').textContent = coarse ? '끝낼 곳의 낱말을 탭하세요' : '끝낼 곳의 낱말을 클릭하세요';
@@ -1519,7 +1552,7 @@ function showSelbar(rect, mode, hid = '', palette = false) {
       + `<button data-act="underline" aria-label="빨간 밑줄" aria-pressed="${!!ctx.ul}"><span class="ul-ico">가</span></button>`
       + `<span class="sep"></span><button data-act="memo">메모</button><button data-act="copy">복사</button>${h ? '<button data-act="del">지우기</button>' : ''}</div>`;
   const cont = atPageEnd(h ? h.e : selectionPos()?.e) ? '<button data-act="extend">다음 쪽까지 ›</button>' : '';
-  const picked = h ? h.text : getSelection().toString();
+  const picked = h ? h.text : selText();
   const tools = '<button data-act="translate">번역</button>' + (isWordish(picked) ? '<button data-act="dict">사전</button>' : '');
   const sub = palette ? '' : tools + (mode === 'new' && !R.book?.isPdf ? '<button data-act="sentence">문장 전체</button><button data-act="para">문단 전체</button>' : '') + cont;
   selbar.innerHTML = row1 + (sub ? `<div class="sb-row sb-sub">${sub}</div>` : '');
@@ -1557,22 +1590,21 @@ selbar.addEventListener('click', e => {
     return editAnnotation(h.id);
   }
   if (act === 'memo') { const rect = selbar._rect, t = h || createAnnotation('hl', 'yellow'); if (t) { hideSelbar(); hideHandles(); return openPop('memo', t, rect); } }
-  else if (act === 'copy') copyText(h ? h.text : getSelection().toString());
+  else if (act === 'copy') copyText(h ? h.text : selText());
   else if (act === 'del') { if (ctx.ul) deleteH(ctx.ul.id); if (ctx.hl) deleteH(ctx.hl.id); toast('지웠어요'); }
-  else if (act === 'sentence') expandSentence();
-  else if (act === 'para') expandParagraph();
+  else if (act === 'sentence') return expandSentence(); // the wider selection brings its own menu
+  else if (act === 'para') return expandParagraph();
   else if (act === 'extend') { hideSelbar(); startExtend(h ? h.id : null); return; }
   else if (act === 'translate' || act === 'dict') {
     const p = h ? { s: h.s, e: h.e } : R.book.isPdf ? {} : selectionPos();
     if (!p) return hideSelbar();
-    const text = (h ? h.text : R.book.isPdf ? getSelection().toString() : rangeText(p.s, p.e)).trim();
+    const text = (h ? h.text : R.book.isPdf ? selText() : rangeText(p.s, p.e)).trim();
     if (!text) return hideSelbar();
     p.rects = !h && R.book.isPdf ? pdfRectsFromSelection() : null;
-    hideSelbar(); hideHandles(); getSelection().removeAllRanges();
+    hideSelbar(); hideHandles(); clearSel();
     return openPop(act, { ch: R.ch, s: p.s, e: p.e, rects: p.rects, hid: h?.id || null, text }, selbar._rect);
   }
-  hideSelbar();
-  if (act !== 'sentence' && act !== 'para') hideHandles();
+  hideSelbar(); hideHandles(); clearSel();
 });
 
 /* ================= input: tap, swipe, wheel, keys ================= */
@@ -1589,15 +1621,6 @@ function wordRangeAt(x, y) {
   const r = document.createRange(); r.setStart(c.node, a); r.setEnd(c.node, b);
   return r;
 }
-// select a range programmatically and give it the reader's own handles + menu (used for touch)
-function touchSelect(r) {
-  reader.classList.add('tsel-on');
-  const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r);
-  clearTimeout(selT); closePop();
-  R.edit = { sel: true }; positionHandles();
-  showSelbar(visibleRect(r), 'new');
-}
-function endTouchSelect() { reader.classList.remove('tsel-on'); if (R.edit?.sel) { R.edit = null; positionHandles(); } }
 const LP = { t: 0, hint: [] };
 function lpClear() { clearTimeout(LP.t); LP.hint.forEach(h => h.remove()); LP.hint = []; }
 stage.addEventListener('contextmenu', e => {
@@ -1620,20 +1643,14 @@ stage.addEventListener('pointerdown', e => {
   if (e.button > 0) return;
   ptr = { x: e.clientX, y: e.clientY, t: Date.now(), type: e.pointerType, drag: false };
   lpClear();
-  if (R.edit?.sel) { // touching the page again ends a touch selection (and keeps Android's own selection from starting)
-    getSelection().removeAllRanges(); endTouchSelect(); hideSelbar(); ptr.dismissed = true;
-  }
+  if (TS.range) { clearSel(); hideSelbar(); ptr.dismissed = true; } // touching the page again ends a touch selection
   if (e.pointerType !== 'mouse' && R.book && !R.ext && content.contains(e.target)) {
     const p0 = ptr;
-    LP.t = setTimeout(() => { // long press: show which word will be selected; it is selected when the finger lifts
+    LP.t = setTimeout(() => { // long press: select the word right away, while the finger is still down
       if (ptr !== p0 || p0.drag) return;
       const r = wordRangeAt(p0.x, p0.y); if (!r) return;
-      p0.long = r; navigator.vibrate?.(12);
-      LP.hint = [...r.getClientRects()].filter(x => x.width).map(x => {
-        const d = Object.assign(document.createElement('div'), { className: 'lp-hint' });
-        Object.assign(d.style, { left: x.left - 2 + 'px', top: x.top - 1 + 'px', width: x.width + 4 + 'px', height: x.height + 2 + 'px' });
-        document.body.appendChild(d); return d;
-      });
+      p0.long = true; navigator.vibrate?.(12);
+      setTouchRange(r);
     }, 300);
   }
 });
@@ -1641,7 +1658,7 @@ stage.addEventListener('pointermove', e => {
   if (ptr && !ptr.long && Math.hypot(e.clientX - ptr.x, e.clientY - ptr.y) > 8) lpClear(); // moved: a scroll or swipe, not a long press
   if (!ptr || ptr.type === 'mouse' || S.mode !== 'paged' || ptr.long) return;
   const dx = e.clientX - ptr.x, dy = e.clientY - ptr.y;
-  if (!getSelection().isCollapsed) return;
+  if (curRange()) return;
   if (!ptr.drag && Math.abs(dx) > 10 && Math.abs(dx) > Math.abs(dy) * 1.2) ptr.drag = true;
   if (ptr.drag) { content.style.transition = 'none'; content.style.transform = `translate3d(${-R.page * R.step + dx}px,0,0)`; }
 });
@@ -1650,11 +1667,11 @@ stage.addEventListener('pointerup', e => {
   if (!ptr) return;
   const p = ptr; ptr = null;
   lpClear();
-  if (p.long) return touchSelect(p.long);
+  if (p.long) return; // already selected at the 0.3 s mark
   if (p.dismissed && !p.drag) return;
   const dx = e.clientX - p.x, dy = e.clientY - p.y, dt = Date.now() - p.t;
   if (p.drag) { if (Math.abs(dx) > 50 || (Math.abs(dx) > 20 && dt < 250)) dx < 0 ? next() : prev(); else goPage(R.page); return; }
-  if (!getSelection().isCollapsed) return;
+  if (curRange()) return;
   if (Math.abs(dx) < 8 && Math.abs(dy) < 8 && dt < 600) onTap(e);
 });
 function onTap(e) {
@@ -2258,6 +2275,7 @@ function pdfShown() { // the page(s) on screen
   return reader.classList.contains('spread') && R.ch + 1 < n ? [R.ch, R.ch + 1] : [R.ch];
 }
 async function renderPdf(ch, target = {}, animate = true) {
+  if (TS.range) clearSel();
   const tok = ++renderToken, n = R.book.chapters.length, lib = window.pdfjsLib;
   updateSpread();
   const spread = reader.classList.contains('spread');
@@ -2315,9 +2333,8 @@ async function pdfTurn(dir) {
 }
 // selection → rectangles relative to each page (0–1), merged per line
 function pdfRectsFromSelection() {
-  const sel = getSelection(); if (!sel.rangeCount || sel.isCollapsed) return null;
-  const boxes = $$('.pdf-page', content).map(b => [b, b.getBoundingClientRect()]), out = [];
-  const range = sel.getRangeAt(0), rects = [];
+  const range = curRange(); if (!range) return null;
+  const boxes = $$('.pdf-page', content).map(b => [b, b.getBoundingClientRect()]), out = [], rects = [];
   const root = range.commonAncestorContainer.nodeType === 3 ? range.commonAncestorContainer.parentNode : range.commonAncestorContainer;
   const w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
   for (let n = w.currentNode.nodeType === 3 ? w.currentNode : w.nextNode(); n; n = w.nextNode()) {
