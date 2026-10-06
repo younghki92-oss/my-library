@@ -87,6 +87,25 @@ svg.i{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.7;stro
 .confirm div{display:flex;gap:6px;flex-wrap:wrap;justify-content:center}
 .confirm .btn{padding:6px 12px;font-size:13px}
 .hint{color:var(--muted);font-size:13px;margin-top:40px;line-height:1.6}
+.drive-chip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:7px 13px;cursor:pointer;font-size:13px;color:var(--ink);white-space:nowrap}
+.drive-chip .dot{width:7px;height:7px;border-radius:50%;background:var(--muted)}
+.drive-chip.ok .dot{background:#3FA66B} .drive-chip.busy .dot{background:var(--accent);animation:blink 1s steps(2) infinite} .drive-chip.err .dot{background:var(--ribbon)}
+@keyframes blink{50%{opacity:.25}}
+.cloud{font-size:11px;color:var(--muted)}
+.card.loading .cover-btn{opacity:.55}
+dialog.lib-dlg{border:0;border-radius:16px;background:var(--surface);color:var(--ink);padding:22px;width:min(440px,calc(100% - 32px));box-shadow:var(--shadow);box-sizing:border-box}
+dialog.lib-dlg::backdrop{background:var(--scrim)}
+.lib-dlg h2{margin:0 0 6px;font-size:18px}
+.lib-dlg p.sub{margin:0 0 16px;color:var(--muted);font-size:13.5px;line-height:1.55}
+.lib-dlg label{display:flex;flex-direction:column;gap:6px;font-size:13px;color:var(--muted);font-weight:500;margin-bottom:14px}
+.lib-dlg input{border:1px solid var(--line);border-radius:10px;padding:10px 12px;font:inherit;font-size:14.5px;background:var(--bg);color:var(--ink)}
+.lib-dlg small{color:var(--muted);font-size:12px;line-height:1.5;font-weight:400}
+.lib-dlg details{margin-bottom:14px;font-size:13px;color:var(--muted)}
+.lib-dlg summary{cursor:pointer;margin-bottom:10px}
+.dlg-acts{display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end;margin-top:6px}
+.dlg-acts .left{margin-right:auto}
+.toast-act{margin-left:10px;border:0;background:var(--bg);color:var(--ink);border-radius:8px;padding:5px 10px;font:inherit;font-size:13px;font-weight:600;cursor:pointer}
+#toast.has-act{pointer-events:auto}
 #drop{position:fixed;inset:12px;border:2px dashed var(--accent);border-radius:18px;background:color-mix(in srgb,var(--bg) 88%,transparent);display:flex;align-items:center;justify-content:center;font-size:18px;color:var(--accent);z-index:50;pointer-events:none}
 
 /* ---------- reader ---------- */
@@ -247,6 +266,7 @@ mark.pend{background:var(--hl-yellow);color:inherit;outline:1.5px dashed var(--a
 <section id="library" aria-label="서재">
   <header class="lib-head">
     <div class="brand"><span class="mark" aria-hidden="true"></span>여백</div>
+    <button class="drive-chip" id="driveBtn"><span class="dot"></span><span id="driveTxt">Google Drive 연결</span></button>
     <button class="btn" id="installBtn" hidden>앱으로 설치</button>
     <button class="btn primary" id="addBtn"><svg class="i" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>책 추가</button>
     <input type="file" id="fileIn" multiple accept=".epub,.txt,application/epub+zip,text/plain" hidden>
@@ -254,9 +274,10 @@ mark.pend{background:var(--hl-yellow);color:inherit;outline:1.5px dashed var(--a
   <div id="continue"></div>
   <div class="shelf-head"><h2>서재</h2><span id="count"></span></div>
   <div id="grid"></div>
-  <p class="hint">EPUB·TXT 파일을 이 창에 끌어다 놓거나 ‘책 추가’를 누르세요.<br>가져온 책과 밑줄은 이 기기의 브라우저 안에만 저장돼요.</p>
+  <p class="hint" id="libHint"></p>
 </section>
 <div id="drop" hidden>여기에 놓으면 서재에 추가돼요</div>
+<dialog class="lib-dlg" id="libDlg"></dialog>
 
 <section id="reader" hidden aria-label="책 읽기">
   <div id="stage">
@@ -327,6 +348,16 @@ const store = (() => {
     async put(n, k, v) { const d = await open(); if (!d) { mem[n].set(k, v); return; } return run(d, n, 'readwrite', os => os.put(v, k)); },
     async del(n, k) { const d = await open(); if (!d) { mem[n].delete(k); return; } return run(d, n, 'readwrite', os => os.delete(k)); },
     async all(n) { const d = await open(); return d ? (await run(d, n, 'readonly', os => os.getAll())) || [] : [...mem[n].values()]; },
+    async entries(n) {
+      const d = await open(); if (!d) return [...mem[n].entries()];
+      return new Promise(res => {
+        try {
+          const os = d.transaction(n, 'readonly').objectStore(n), k = os.getAllKeys(), v = os.getAll();
+          v.onsuccess = () => res(k.result.map((key, i) => [key, v.result[i]]));
+          v.onerror = () => res([]);
+        } catch { res([]); }
+      });
+    },
   };
 })();
 const ls = {
@@ -343,8 +374,9 @@ const FONTS = {
 };
 const MARGINS = ['clamp(16px,4vw,32px)', 'clamp(20px,6vw,64px)', 'clamp(28px,11vw,120px)'];
 const THEMES = [['auto', '자동', 'linear-gradient(135deg,#FCFCFA 50%,#16181D 50%)'], ['paper', '종이', '#FFFFFF'], ['sepia', '세피아', '#F2E9D8'], ['night', '밤', '#0F1114']];
-const DEFAULTS = { font: 'gowun', size: 19, lh: 1.8, margin: 1, theme: 'auto', mode: 'paged', justify: true, spread: true, cpm: 500 };
+const DEFAULTS = { font: 'gowun', size: 19, lh: 1.8, margin: 1, theme: 'auto', mode: 'paged', justify: true, spread: 'auto', cpm: 500 };
 const S = Object.assign({}, DEFAULTS, ls.get('yb-settings', {}));
+if (typeof S.spread === 'boolean') S.spread = S.spread ? 'auto' : 'never';
 const saveSettings = () => ls.set('yb-settings', S);
 
 /* ================= helpers ================= */
@@ -387,9 +419,17 @@ function fmtMin(chars) {
   if (m <= 1) return '1분 미만';
   return m < 60 ? `${m}분` : `${Math.floor(m / 60)}시간${m % 60 ? ' ' + (m % 60) + '분' : ''}`;
 }
-function toast(msg) {
-  const t = $('#toast'); t.textContent = msg; t.classList.add('show');
-  clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove('show'), 2600);
+function toast(msg, action) {
+  const t = $('#toast');
+  t.textContent = msg;
+  t.classList.toggle('has-act', !!action);
+  if (action) {
+    const b = Object.assign(document.createElement('button'), { className: 'toast-act', textContent: action.label });
+    b.onclick = () => { t.classList.remove('show'); action.fn(); };
+    t.appendChild(b);
+  }
+  t.classList.add('show');
+  clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove('show'), action ? 7000 : 2600);
 }
 function copyText(text) {
   if (!text) return;
@@ -532,7 +572,7 @@ function loadTxt(buf, name) {
 }
 
 /* ================= built-in sample book ================= */
-const SAMPLE_META = { id: 'sample', format: 'sample', title: '여백에 대하여', author: '여백 리더 안내서', sample: true, addedAt: 0 };
+const SAMPLE_META = { id: 'sample', source: 'sample', format: 'sample', title: '여백에 대하여', author: '여백 리더 안내서', sample: true, addedAt: 0 };
 const SAMPLE_QUOTE = '읽는 동안에는 아무것도 방해하지 않고, 필요할 때는 손 닿는 곳에 있을 것. 이것이 이 앱이 지키려는 단 하나의 원칙입니다.';
 const SAMPLE = [
   ['첫 장을 넘기며', `<h1>첫 장을 넘기며</h1>
@@ -588,11 +628,30 @@ function coverHTML(meta) {
   let h = 0; for (const c of meta.title) h = (h * 31 + c.charCodeAt(0)) >>> 0;
   return `<div class="cover gen" style="background:${COVER_COLORS[h % COVER_COLORS.length]}"><span class="t">${esc(meta.title)}</span><span class="a">${esc(meta.author || (meta.format === 'txt' ? '텍스트 파일' : ''))}</span></div>`;
 }
+const isDrive = id => typeof id === 'string' && id.startsWith('d:');
+// title/author the reader sees: own edit (synced) > the EPUB's metadata > a guess from the file name
+function displayMeta(b, st) {
+  return { ...b, title: st?.title || b.title, author: st?.title || st?.author ? (st.author ?? b.author) : b.author };
+}
+async function libraryBooks() {
+  const metas = (await store.all('books')).filter(Boolean);
+  const local = metas.filter(m => !isDrive(m.id));
+  const dmeta = new Map(metas.filter(m => isDrive(m.id)).map(m => [m.id, m]));
+  const drive = G.on ? G.list.filter(f => /\.(epub|txt)$/i.test(f.name)).map(f => {
+    const id = 'd:' + f.id, m = dmeta.get(id) || {}, g = guessMeta(f.name);
+    return { id, source: 'drive', file: f, format: /\.txt$/i.test(f.name) ? 'txt' : 'epub',
+      title: m.title || g.title, author: m.title ? (m.author || '') : g.author, cover: m.cover, coverType: m.coverType,
+      cached: !!m.cachedMt && m.cachedMt === f.modifiedTime, addedAt: Date.parse(f.modifiedTime) || 0 };
+  }) : [];
+  const list = [...drive, ...local];
+  if (!ls.get('yb-hide-sample', false)) list.push(SAMPLE_META);
+  return list;
+}
 async function renderLibrary() {
-  const books = (await store.all('books')).filter(Boolean);
-  if (!ls.get('yb-hide-sample', false)) books.push(SAMPLE_META);
-  const states = new Map(await Promise.all(books.map(async b => [b.id, await store.get('state', b.id)])));
-  books.sort((a, b) => (states.get(b.id)?.lastOpened || b.addedAt || 0) - (states.get(a.id)?.lastOpened || a.addedAt || 0));
+  const raw = await libraryBooks();
+  const states = new Map(await Promise.all(raw.map(async b => [b.id, await store.get('state', b.id)])));
+  const books = raw.map(b => displayMeta(b, states.get(b.id)));
+  books.sort((a, b) => (states.get(b.id)?.lastOpened || 0) - (states.get(a.id)?.lastOpened || 0) || (b.addedAt || 0) - (a.addedAt || 0));
   const pctOf = id => Math.round((states.get(id)?.progress || 0) * 100);
 
   const last = books[0];
@@ -608,27 +667,65 @@ async function renderLibrary() {
   } else cont.innerHTML = '';
 
   $('#count').textContent = `${books.length}권`;
+  const footOf = b => b.sample ? '<span class="badge">예시</span>'
+    : pctOf(b.id) ? pctOf(b.id) + '%'
+    : b.source === 'drive' && !b.cached ? '<span class="cloud">☁ Drive</span>' : '새 책';
   $('#grid').innerHTML = books.map(b => `<article class="card" data-id="${esc(b.id)}">
     <button class="cover-btn" data-open="${esc(b.id)}" aria-label="${esc(b.title)} 열기">${coverHTML(b)}</button>
     <h3>${esc(b.title)}</h3>
     <div class="bar"><i style="width:${pctOf(b.id)}%"></i></div>
-    <div class="card-foot"><span>${b.sample ? '<span class="badge">예시</span>' : (pctOf(b.id) ? pctOf(b.id) + '%' : '새 책')}</span>
-      <button class="more" data-ask="${esc(b.id)}" aria-label="${esc(b.title)} 지우기">⋯</button></div>
-    <div class="confirm" hidden>서재에서 지울까요?<div><button class="btn danger" data-del="${esc(b.id)}">지우기</button><button class="btn" data-cancel>취소</button></div></div>
+    <div class="card-foot"><span class="foot-txt">${footOf(b)}</span>
+      <button class="more" data-edit="${esc(b.id)}" aria-label="${esc(b.title)} 정보 고치기">⋯</button></div>
   </article>`).join('') || '<p class="empty">서재가 비어 있어요. ‘책 추가’로 첫 책을 넣어 보세요.</p>';
+  $('#libHint').innerHTML = G.on
+    ? 'Google Drive 책 폴더의 EPUB·TXT가 이 서재에 보여요. 읽은 위치와 하이라이트는 Drive를 통해 다른 기기와 맞춰져요.<br>이 기기에서 직접 추가한 책은 이 기기에만 있어요.'
+    : 'EPUB·TXT 파일을 이 창에 끌어다 놓거나 ‘책 추가’를 누르세요. 가져온 책은 이 기기에만 저장돼요.<br>‘Google Drive 연결’을 누르면 Drive 책 폴더를 서재로 쓰고, 다른 기기와 읽은 위치·하이라이트를 맞출 수 있어요.';
+  updateDriveChip();
+  LIB.books = books;
 }
+const LIB = { books: [] };
 library.addEventListener('click', async e => {
   const t = e.target.closest('button'); if (!t) return;
   if (t.dataset.open) openBook(t.dataset.open);
-  else if (t.dataset.ask) t.closest('.card').querySelector('.confirm').hidden = false;
-  else if ('cancel' in t.dataset) t.closest('.confirm').hidden = true;
-  else if (t.dataset.del) {
-    const id = t.dataset.del;
-    if (id === 'sample') ls.set('yb-hide-sample', true);
-    else await Promise.all([store.del('books', id), store.del('files', id), store.del('state', id)]);
-    toast('서재에서 지웠어요'); renderLibrary();
-  }
+  else if (t.dataset.edit) openBookDialog(LIB.books.find(b => b.id === t.dataset.edit));
 });
+function openBookDialog(b) {
+  if (!b) return;
+  const dlg = $('#libDlg');
+  const drive = b.source === 'drive';
+  dlg.innerHTML = `<form method="dialog" id="bookForm">
+    <h2>책 정보</h2>
+    <p class="sub">${drive ? 'Drive 파일: ' + esc(b.file.name) : b.sample ? '앱에 들어 있는 예시 책이에요.' : '이 기기에 추가한 책이에요.'}</p>
+    ${b.sample ? '' : `<label>제목<input id="bTitle" value="${esc(b.title)}"></label><label>저자<input id="bAuthor" value="${esc(b.author || '')}"></label>`}
+    <div class="dlg-acts">
+      ${drive ? (b.cached ? '<button class="btn left" value="uncache">받아 둔 파일 지우기</button>' : '') : '<button class="btn danger left" value="delete">서재에서 지우기</button>'}
+      <button class="btn" value="cancel">닫기</button>${b.sample ? '' : '<button class="btn primary" value="save">저장</button>'}
+    </div></form>`;
+  dlg.onclose = async () => {
+    const v = dlg.returnValue;
+    if (v === 'save') {
+      const title = $('#bTitle').value.trim() || b.title, author = $('#bAuthor').value.trim();
+      if (drive) { // edits on Drive books travel with the sync file
+        const st = (await store.get('state', b.id)) || { loc: { ch: 0, block: 0 }, highlights: [], bookmarks: [] };
+        Object.assign(st, { title, author, metaAt: Date.now() });
+        await store.put('state', b.id, st); queueSync();
+      } else {
+        const m = await store.get('books', b.id); if (m) await store.put('books', b.id, { ...m, title, author });
+      }
+      toast('책 정보를 고쳤어요');
+    } else if (v === 'delete') {
+      if (b.sample) ls.set('yb-hide-sample', true);
+      else await Promise.all([store.del('books', b.id), store.del('files', b.id), store.del('state', b.id)]);
+      toast('서재에서 지웠어요');
+    } else if (v === 'uncache') {
+      await store.del('files', b.id);
+      const m = await store.get('books', b.id); if (m) await store.put('books', b.id, { ...m, cachedMt: null });
+      toast('받아 둔 파일을 지웠어요. 다음에 열 때 다시 받아요.');
+    }
+    renderLibrary();
+  };
+  dlg.showModal();
+}
 $('#addBtn').onclick = () => $('#fileIn').click();
 $('#fileIn').onchange = e => { importFiles([...e.target.files]); e.target.value = ''; };
 let dragDepth = 0;
@@ -665,26 +762,60 @@ const sentinel = Object.assign(document.createElement('span'), { id: 'sentinel' 
 const R = { edit: null, ext: null, book: null, id: null, ch: 0, page: 0, pages: 1, step: 0, blocks: [], blockIdx: new Map(), st: null, lens: null, texts: null, total: 0, seeking: false };
 
 async function openBook(id) {
+  if (openBook.busy) return;
+  openBook.busy = true;
   try {
-    const meta = id === 'sample' ? SAMPLE_META : await store.get('books', id);
-    if (!meta) return toast('책을 찾을 수 없어요');
-    let book;
-    if (id === 'sample') book = sampleBook();
-    else {
+    let meta, book;
+    if (id === 'sample') { meta = SAMPLE_META; book = sampleBook(); }
+    else if (isDrive(id)) {
+      const f = G.list.find(x => 'd:' + x.id === id);
+      const m = (await store.get('books', id)) || { id, source: 'drive' };
+      let buf = await store.get('files', id);
+      if (f && (!buf || m.cachedMt !== f.modifiedTime)) {
+        buf = await driveDownload(f, pct => cardStatus(id, `받는 중 ${Math.round(pct * 100)}%`));
+        await store.put('files', id, buf); m.cachedMt = f.modifiedTime;
+      }
+      if (!buf) return toast('Drive에 연결한 뒤 다시 열어 주세요');
+      const name = f?.name || m.name || '';
+      const fmt = /\.txt$/i.test(name) ? 'txt' : 'epub';
+      book = fmt === 'txt' ? loadTxt(buf, guessMeta(name).title) : await loadEpub(buf);
+      if (!m.title) { // first open: keep the EPUB's own title, author and cover for the shelf
+        const g = guessMeta(name);
+        m.title = fmt === 'epub' && book.title && book.title !== '제목 없음' ? book.title : g.title;
+        m.author = fmt === 'epub' ? book.author || g.author : g.author;
+        const cv = fmt === 'epub' ? await book.coverData().catch(() => null) : null;
+        if (cv) { m.cover = cv.buf; m.coverType = cv.type; }
+      }
+      m.name = name;
+      await store.put('books', id, m);
+      meta = { ...m, format: fmt };
+      if (G.on) await Promise.race([syncNow(), new Promise(r => setTimeout(r, 4000))]); // newest position first
+    } else {
+      meta = await store.get('books', id);
+      if (!meta) return toast('책을 찾을 수 없어요');
       const buf = await store.get('files', id);
       if (!buf) return toast('책 파일을 찾을 수 없어요. 다시 추가해 주세요.');
       book = meta.format === 'txt' ? loadTxt(buf, meta.title) : await loadEpub(buf);
     }
     Object.assign(R, { anchor: null, book, id, meta, lens: null, texts: null, total: 0, ch: 0, page: 0 });
     R.st = (await store.get('state', id)) || (id === 'sample' ? sampleState() : { loc: { ch: 0, block: 0 }, highlights: [], bookmarks: [] });
-    $('#tbTitle').textContent = book.title; $('#tbAuthor').textContent = book.author || '';
+    const shown = displayMeta({ title: meta.title || book.title, author: meta.author ?? book.author }, R.st);
+    $('#tbTitle').textContent = shown.title; $('#tbAuthor').textContent = shown.author || '';
     library.hidden = true; reader.hidden = false; reader.classList.remove('ui-hidden');
     try { history.pushState({ reader: 1 }, ''); } catch {}
     applySettings();
     await renderChapter(R.st.loc?.ch || 0, { block: R.st.loc?.block || 0 }, false);
     requestWake();
     indexBook(book);
-  } catch (err) { console.error(err); toast('책을 여는 중 문제가 생겼어요: ' + (err.message || err)); }
+  } catch (err) {
+    console.error(err);
+    toast(isDrive(id) && /fetch|download|401|403|token|popup/i.test(err.message || '') ? 'Drive에서 책을 받지 못했어요. 연결 상태를 확인해 주세요.' : '책을 여는 중 문제가 생겼어요: ' + (err.message || err));
+    renderLibrary();
+  } finally { openBook.busy = false; }
+}
+function cardStatus(id, text) {
+  const card = $(`.card[data-id="${CSS.escape(id)}"]`); if (!card) return;
+  card.classList.add('loading'); const ft = card.querySelector('.foot-txt'); if (ft) ft.textContent = text;
 }
 function closeReader() {
   if (!R.book) return;
@@ -739,7 +870,13 @@ async function renderChapter(ch, target = {}, animate = true) {
   goTarget(target);
   if (animate && !reduceMotion) content.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 200, easing: 'ease-out' });
 }
-function updateSpread() { reader.classList.toggle('spread', S.mode === 'paged' && S.spread && reader.clientWidth >= 960); }
+// two pages side by side: "auto" picks it for wide, near-square-or-wider screens (an unfolded Fold, a laptop window)
+function wantSpread() {
+  if (S.mode !== 'paged' || S.spread === 'never') return false;
+  const w = reader.clientWidth, h = reader.clientHeight || 1;
+  return S.spread === 'always' ? w >= 520 : w >= 760 && w / h >= 0.72;
+}
+function updateSpread() { reader.classList.toggle('spread', wantSpread()); }
 function layout() {
   const W = page.clientWidth, H = page.clientHeight;
   content.style.setProperty('--page-h', H + 'px');
@@ -869,12 +1006,24 @@ function updateChrome() {
 }
 let saveT;
 function scheduleSave() { clearTimeout(saveT); saveT = setTimeout(saveNow, 450); }
+// a stable JSON string (sorted keys) so two copies of the same data compare equal
+const canon = o => JSON.stringify(o, (k, v) => v && typeof v === 'object' && !Array.isArray(v) ? Object.fromEntries(Object.keys(v).sort().map(x => [x, v[x]])) : v);
+function stampItems(st) { // give every highlight/bookmark a modified time when its content changes
+  for (const x of [...(st.highlights || []), ...(st.bookmarks || [])]) {
+    const sig = canon([x.s, x.e, x.color, x.kind, x.note, x.b, x.ch]);
+    if (x.sig !== sig) { x.sig = sig; x.mt = Date.now(); }
+  }
+}
+function bury(id) { (R.st.tomb ||= []).push({ id, mt: Date.now() }); } // remember deletions so sync doesn't bring them back
 function saveNow() {
   if (!R.book) return;
-  R.st.loc = { ch: R.ch, block: R.anchor ?? currentAnchor() };
+  const loc = { ch: R.ch, block: R.anchor ?? currentAnchor() };
+  if (!R.st.loc || R.st.loc.ch !== loc.ch || R.st.loc.block !== loc.block) { R.st.loc = loc; R.st.locAt = Date.now(); }
   R.st.progress = bookFraction(); R.st.lastOpened = Date.now();
   if (R.total) R.st.total = R.total;
+  stampItems(R.st);
   store.put('state', R.id, R.st);
+  if (isDrive(R.id)) queueSync();
 }
 function seekTarget(f) {
   const n = R.book.chapters.length;
@@ -902,7 +1051,7 @@ function updateBookmark() {
 }
 $('#bmBtn').onclick = () => {
   const hit = R.st.bookmarks.filter(onCurrentPage);
-  if (hit.length) { R.st.bookmarks = R.st.bookmarks.filter(b => !hit.includes(b)); toast('책갈피를 뺐어요'); }
+  if (hit.length) { R.st.bookmarks = R.st.bookmarks.filter(b => !hit.includes(b)); hit.forEach(b => bury(b.id)); toast('책갈피를 뺐어요'); }
   else { const b = currentAnchor(); R.st.bookmarks.push({ id: uid('k'), ch: R.ch, b, text: (R.blocks[b]?.textContent || '').trim().slice(0, 90), at: Date.now() }); toast('책갈피를 꽂았어요'); }
   updateBookmark(); saveNow();
 };
@@ -961,7 +1110,7 @@ function createAnnotation(kind, color = 'yellow') {
 }
 function refreshMarks(h) { marksOf(h.id).forEach(m => { m.className = markClass(h); }); }
 function deleteH(id) {
-  marksOf(id).forEach(unwrap); R.st.highlights = R.st.highlights.filter(h => h.id !== id);
+  marksOf(id).forEach(unwrap); R.st.highlights = R.st.highlights.filter(h => h.id !== id); bury(id);
   if (R.edit?.id === id) hideHandles();
   saveNow();
 }
@@ -1386,7 +1535,7 @@ function renderNotes() {
     else if (d.goB) { const k = R.st.bookmarks.find(x => x.id === d.goB); closeSheet(); renderChapter(k.ch, { block: k.b }); }
     else if (d.memo) openSheet('memo', findH(d.memo));
     else if (d.delH) { deleteH(d.delH); renderNotes(); }
-    else if (d.delB) { R.st.bookmarks = R.st.bookmarks.filter(x => x.id !== d.delB); updateBookmark(); saveNow(); renderNotes(); }
+    else if (d.delB) { R.st.bookmarks = R.st.bookmarks.filter(x => x.id !== d.delB); bury(d.delB); updateBookmark(); saveNow(); renderNotes(); }
   };
 }
 
@@ -1410,7 +1559,9 @@ function renderSettings() {
   <div class="field"><span class="lbl">좌우 여백</span>${seg('margin', [[0, '좁게'], [1, '보통'], [2, '넓게']])}</div>
   <div class="field"><span class="lbl">넘김 방식</span>${seg('mode', [['paged', '쪽 넘기기'], ['scroll', '스크롤']])}</div>
   <div class="field"><label class="toggle" for="justIn">양쪽 정렬<input type="checkbox" id="justIn" ${S.justify ? 'checked' : ''}></label>
-    <label class="toggle" for="spreadIn">넓은 화면에서 두 쪽 펼쳐 보기<input type="checkbox" id="spreadIn" ${S.spread ? 'checked' : ''}></label></div>
+    </div>
+  <div class="field"><span class="lbl">두 쪽 보기</span>${seg('spread', [['auto', '자동'], ['always', '항상 두 쪽'], ['never', '항상 한 쪽']])}
+    <small style="color:var(--r-muted);font-size:12px;line-height:1.5">폴드를 펼쳤는데 한 쪽만 나오면 ‘항상 두 쪽’으로 두세요.</small></div>
   <div class="field"><label for="cpmIn">읽기 속도 <span id="cpmOut">1분에 ${S.cpm}자</span></label><input type="range" id="cpmIn" min="250" max="1200" step="50" value="${S.cpm}"></div>`;
   body().onclick = e => {
     const b = e.target.closest('button'); if (!b) return;
@@ -1422,7 +1573,6 @@ function renderSettings() {
   $('#cpmIn').oninput = e => $('#cpmOut').textContent = `1분에 ${e.target.value}자`;
   $('#cpmIn').onchange = e => changeSetting('cpm', +e.target.value);
   $('#justIn').onchange = e => changeSetting('justify', e.target.checked);
-  $('#spreadIn').onchange = e => changeSetting('spread', e.target.checked);
 }
 function changeSetting(k, v) {
   const a = R.book ? (R.anchor ?? currentAnchor()) : 0;
@@ -1592,6 +1742,254 @@ function renderDict(arg) {
   })();
 }
 
+/* ================= Google Drive: library folder + sync ================= */
+// Books come from a Drive folder (read-only). Reading position, highlights, bookmarks and title edits
+// live in one JSON file in the app's hidden Drive folder (appDataFolder), merged item by item.
+const DEFAULT_CID = '176016755027-u2v546hup548s1lg6j99023u8n2d6e0i.apps.googleusercontent.com';
+const DEFAULT_FID = '1RqBOCgukIDMIHXjQ0u0ceOxQDrsbH8rw';
+const SCOPES = 'https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/drive.appdata';
+const SYNC_FILE = 'yeobaek-state.json';
+const G = {
+  cid: ls.get('yb-g-cid', '') || DEFAULT_CID, fid: ls.get('yb-g-fid', '') || DEFAULT_FID,
+  on: ls.get('yb-g-on', false), token: ls.get('yb-g-tok', null),
+  list: ls.get('yb-drive-list', { files: [] }).files || [], listAt: ls.get('yb-drive-list', { at: 0 }).at || 0,
+  lastSync: ls.get('yb-g-sync', 0), client: null, syncing: null, scanning: false, err: null,
+};
+function loadGIS() {
+  if (window.google?.accounts?.oauth2) return Promise.resolve();
+  return loadGIS.p || (loadGIS.p = new Promise((res, rej) => {
+    const sc = Object.assign(document.createElement('script'), { src: 'https://accounts.google.com/gsi/client', async: true });
+    sc.onload = res; sc.onerror = () => { loadGIS.p = null; rej(new Error('Google 로그인을 불러오지 못했어요')); };
+    document.head.appendChild(sc);
+  }));
+}
+async function getToken(interactive) {
+  if (G.token && Date.now() < G.token.exp - 60000) return G.token.v;
+  await loadGIS();
+  return new Promise((res, rej) => {
+    if (!G.client) G.client = google.accounts.oauth2.initTokenClient({ client_id: G.cid, scope: SCOPES, callback: () => {}, error_callback: e => G.onErr?.(e) });
+    G.client.callback = r => {
+      if (r.error) return rej(new Error(r.error));
+      G.token = { v: r.access_token, exp: Date.now() + (r.expires_in || 3600) * 1000 };
+      ls.set('yb-g-tok', G.token); res(G.token.v);
+    };
+    G.onErr = e => rej(new Error(e?.type || 'popup_failed'));
+    try { G.client.requestAccessToken({ prompt: interactive ? '' : 'none' }); } catch (e) { rej(e); }
+  });
+}
+async function gapi(url, opts = {}) {
+  const call = tk => fetch(url, { ...opts, headers: { ...(opts.headers || {}), Authorization: 'Bearer ' + tk } });
+  let r = await call(await getToken(false));
+  if (r.status === 401) { G.token = null; r = await call(await getToken(false)); }
+  return r;
+}
+async function connectDrive() {
+  try {
+    await getToken(true);
+    G.on = true; G.err = null; ls.set('yb-g-on', true);
+    toast('Google Drive에 연결했어요');
+    await scanDrive(); await syncNow(); renderLibrary();
+  } catch (e) {
+    console.warn(e);
+    toast(/popup|closed/i.test(e.message) ? '로그인 창이 닫혔어요. 다시 눌러 주세요.' : 'Google Drive에 연결하지 못했어요: ' + e.message);
+  }
+}
+function disconnectDrive() {
+  try { if (G.token) google.accounts.oauth2.revoke(G.token.v); } catch {}
+  Object.assign(G, { on: false, token: null, err: null });
+  ls.set('yb-g-on', false); ls.set('yb-g-tok', null);
+  toast('Drive 연결을 해제했어요'); renderLibrary();
+}
+async function scanDrive() {
+  if (G.scanning || !G.on) return;
+  G.scanning = true; updateDriveChip();
+  try {
+    const found = [], queue = [G.fid], seen = new Set();
+    while (queue.length) {
+      const folder = queue.shift(); if (seen.has(folder)) continue; seen.add(folder);
+      let pt = '';
+      do {
+        const q = encodeURIComponent(`'${folder}' in parents and trashed=false`);
+        const r = await gapi(`https://www.googleapis.com/drive/v3/files?q=${q}&pageSize=1000&fields=nextPageToken,files(id,name,mimeType,size,modifiedTime)${pt ? '&pageToken=' + pt : ''}`);
+        if (!r.ok) throw new Error(r.status === 404 ? '책 폴더를 찾지 못했어요. 폴더 ID를 확인해 주세요.' : 'Drive 목록을 읽지 못했어요 (' + r.status + ')');
+        const j = await r.json();
+        for (const f of j.files || []) {
+          if (f.mimeType === 'application/vnd.google-apps.folder') queue.push(f.id);
+          else if (/\.(epub|txt|pdf)$/i.test(f.name)) found.push({ id: f.id, name: f.name, size: +f.size || 0, modifiedTime: f.modifiedTime });
+        }
+        pt = j.nextPageToken || '';
+      } while (pt);
+    }
+    G.list = found; G.listAt = Date.now(); G.err = null;
+    ls.set('yb-drive-list', { files: found, at: G.listAt });
+  } catch (e) { console.warn(e); G.err = e; toast(e.message); }
+  finally { G.scanning = false; if (reader.hidden) renderLibrary(); else updateDriveChip(); }
+}
+async function driveDownload(f, onPct) {
+  const r = await gapi(`https://www.googleapis.com/drive/v3/files/${f.id}?alt=media`);
+  if (!r.ok) throw new Error('download ' + r.status);
+  const total = +r.headers.get('content-length') || f.size || 0, rd = r.body.getReader(), parts = [];
+  let got = 0;
+  for (;;) { const { done, value } = await rd.read(); if (done) break; parts.push(value); got += value.length; if (total) onPct(Math.min(1, got / total)); }
+  const out = new Uint8Array(got); let o = 0;
+  for (const c of parts) { out.set(c, o); o += c.length; }
+  return out.buffer;
+}
+
+/* --- merging two copies of the reading record --- */
+const TOMB_DAYS = 120;
+function mergeItems(a, b, tomb) {
+  const m = new Map(), t = x => x.mt || x.at || 0;
+  for (const x of [...(a || []), ...(b || [])]) { const cur = m.get(x.id); if (!cur || t(x) > t(cur)) m.set(x.id, x); }
+  return [...m.values()].filter(x => !(tomb.get(x.id) >= t(x))).sort((p, q) => (p.id < q.id ? -1 : 1));
+}
+function mergeBook(a, b) {
+  if (!a) return b; if (!b) return a;
+  const tomb = new Map(), old = Date.now() - TOMB_DAYS * 864e5;
+  for (const x of [...(a.tomb || []), ...(b.tomb || [])]) if (x.mt > old && !(tomb.get(x.id) >= x.mt)) tomb.set(x.id, x.mt);
+  const pos = (a.locAt || 0) >= (b.locAt || 0) ? a : b, meta = (a.metaAt || 0) >= (b.metaAt || 0) ? a : b;
+  return {
+    loc: pos.loc, locAt: pos.locAt || 0, progress: pos.progress || 0, total: a.total || b.total || 0,
+    lastOpened: Math.max(a.lastOpened || 0, b.lastOpened || 0),
+    title: meta.title, author: meta.author, metaAt: meta.metaAt || 0,
+    highlights: mergeItems(a.highlights, b.highlights, tomb), bookmarks: mergeItems(a.bookmarks, b.bookmarks, tomb),
+    tomb: [...tomb].map(([id, mt]) => ({ id, mt })).sort((p, q) => (p.id < q.id ? -1 : 1)),
+  };
+}
+function mergeAll(x, y) {
+  const books = {};
+  for (const k of new Set([...Object.keys(x.books || {}), ...Object.keys(y.books || {})])) books[k] = mergeBook(x.books?.[k], y.books?.[k]);
+  return { books };
+}
+let syncT;
+function queueSync() { if (!G.on) return; clearTimeout(syncT); syncT = setTimeout(syncNow, 4000); }
+function syncNow() {
+  if (!G.on) return Promise.resolve();
+  if (G.syncing) return G.syncing;
+  G.syncing = (async () => {
+    updateDriveChip();
+    try {
+      const local = {};
+      for (const [k, v] of await store.entries('state')) if (isDrive(k) && v) local[k] = v;
+      const q = encodeURIComponent(`name='${SYNC_FILE}'`);
+      const lr = await gapi(`https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=${q}&fields=files(id,modifiedTime)&orderBy=modifiedTime desc`);
+      if (!lr.ok) throw new Error('sync list ' + lr.status);
+      const files = (await lr.json()).files || [];
+      let remote = { books: {} };
+      for (const f of files) {
+        const r = await gapi(`https://www.googleapis.com/drive/v3/files/${f.id}?alt=media`);
+        if (r.ok) { try { remote = mergeAll(remote, await r.json()); } catch {} }
+      }
+      const merged = mergeAll({ books: local }, remote);
+      for (const [k, v] of Object.entries(merged.books)) {
+        if (canon(v) === canon(local[k] ? mergeBook(local[k], local[k]) : null)) continue;
+        await store.put('state', k, v);
+        if (R.book && R.id === k) applyRemoteState(v);
+      }
+      if (!files.length || canon(merged.books) !== canon(remote.books)) {
+        const blob = new Blob([JSON.stringify({ v: 1, updated: Date.now(), books: merged.books })], { type: 'application/json' });
+        let w;
+        if (files[0]) w = await gapi(`https://www.googleapis.com/upload/drive/v3/files/${files[0].id}?uploadType=media`, { method: 'PATCH', body: blob });
+        else {
+          const form = new FormData();
+          form.append('metadata', new Blob([JSON.stringify({ name: SYNC_FILE, parents: ['appDataFolder'] })], { type: 'application/json' }));
+          form.append('file', blob);
+          w = await gapi('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id', { method: 'POST', body: form });
+        }
+        if (!w.ok) throw new Error('sync write ' + w.status);
+        for (const f of files.slice(1)) gapi(`https://www.googleapis.com/drive/v3/files/${f.id}`, { method: 'DELETE' }).catch(() => {});
+      }
+      G.lastSync = Date.now(); ls.set('yb-g-sync', G.lastSync); G.err = null;
+    } catch (e) { console.warn('sync failed', e); G.err = e; }
+    finally { G.syncing = null; updateDriveChip(); }
+  })();
+  return G.syncing;
+}
+// another device changed the open book: take its highlights now, offer its reading position
+function applyRemoteState(v) {
+  const mine = R.st;
+  const marksChanged = canon([mine.highlights, mine.bookmarks]) !== canon([v.highlights, v.bookmarks]);
+  const ahead = (v.locAt || 0) > (mine.locAt || 0) && v.loc && (v.loc.ch !== mine.loc?.ch || v.loc.block !== mine.loc?.block);
+  R.st = { ...v, loc: mine.loc, locAt: mine.locAt };
+  if (marksChanged && !hdrag && !R.ext) renderChapter(R.ch, { block: R.anchor ?? currentAnchor() }, false);
+  if (ahead) toast('다른 기기에서 읽던 곳이 있어요', { label: '그곳으로', fn: () => { R.st.loc = v.loc; R.st.locAt = v.locAt; renderChapter(v.loc.ch, { block: v.loc.block }); } });
+}
+function updateDriveChip() {
+  const b = $('#driveBtn'), t = $('#driveTxt'); if (!b) return;
+  b.classList.remove('ok', 'busy', 'err');
+  if (!G.on) { t.textContent = 'Google Drive 연결'; return; }
+  if (G.syncing || G.scanning) { b.classList.add('busy'); t.textContent = G.scanning ? '책 폴더 읽는 중…' : '맞추는 중…'; return; }
+  if (G.err) { b.classList.add('err'); t.textContent = '다시 연결'; return; }
+  b.classList.add('ok');
+  const m = G.lastSync ? Math.round((Date.now() - G.lastSync) / 60000) : null;
+  t.textContent = m == null ? 'Drive 연결됨' : m < 1 ? '방금 맞춤' : m < 60 ? `${m}분 전 맞춤` : 'Drive 연결됨';
+}
+$('#driveBtn').onclick = () => {
+  if (!G.on || (G.err && /token|popup|401|interaction|consent|access_denied/i.test(G.err.message))) return connectDrive();
+  openDriveDialog();
+};
+function openDriveDialog() {
+  const dlg = $('#libDlg');
+  const n = G.list.filter(f => /\.(epub|txt)$/i.test(f.name)).length;
+  dlg.innerHTML = `<form method="dialog">
+    <h2>Google Drive</h2>
+    <p class="sub">책 폴더에서 EPUB·TXT ${n}권을 찾았어요.${G.lastSync ? ' 마지막으로 맞춘 때: ' + new Date(G.lastSync).toLocaleString('ko-KR') : ''}${G.err ? '<br>최근 오류: ' + esc(G.err.message) : ''}</p>
+    <label>책 폴더 ID<input id="gFid" value="${esc(G.fid)}" spellcheck="false" autocomplete="off">
+      <small>Drive에서 책 폴더를 열었을 때 주소의 <b>folders/</b> 뒤에 오는 글자예요. 하위 폴더까지 모두 찾아요.</small></label>
+    <details><summary>고급 설정</summary><label>OAuth 클라이언트 ID<input id="gCid" value="${esc(G.cid)}" spellcheck="false" autocomplete="off"></label></details>
+    <div class="dlg-acts">
+      <button class="btn left" value="off">연결 해제</button>
+      <button class="btn" value="sync">지금 맞추기</button>
+      <button class="btn primary" value="save">저장하고 다시 읽기</button>
+    </div></form>`;
+  dlg.onclose = async () => {
+    const v = dlg.returnValue;
+    if (v === 'off') disconnectDrive();
+    else if (v === 'sync') { await syncNow(); await scanDrive(); toast(G.err ? '맞추지 못했어요: ' + G.err.message : '다른 기기와 맞췄어요'); }
+    else if (v === 'save') {
+      const fid = $('#gFid').value.trim().replace(/^.*folders\//, '').replace(/[?#].*$/, ''), cid = $('#gCid').value.trim();
+      if (cid && cid !== G.cid) { G.cid = cid; ls.set('yb-g-cid', cid); G.client = null; G.token = null; }
+      if (fid) { G.fid = fid; ls.set('yb-g-fid', fid); }
+      await scanDrive();
+    }
+  };
+  dlg.showModal();
+}
+// keep devices in step: push when leaving, pull when coming back
+document.addEventListener('visibilitychange', () => {
+  if (!G.on) return;
+  if (document.visibilityState === 'hidden') { if (R.book) saveNow(); syncNow(); }
+  else { syncNow().then(() => { if (reader.hidden) renderLibrary(); }); if (Date.now() - G.listAt > 5 * 60000) scanDrive(); }
+});
+setInterval(() => { if (G.on && document.visibilityState === 'visible') { updateDriveChip(); if (R.book && isDrive(R.id)) syncNow(); } }, 60000);
+
+/* --- file names: "Title -- Author -- z-lib.org.epub" and friends --- */
+const JUNK = [/^[0-9a-f]{32}$/i, /^[0-9a-f]{40}$/i, /anna\s*['’`]?\s*s?\s*archive/i, /z[-\s]?lib(rary)?/i, /libgen|library\s*genesis/i,
+  /oceanofpdf|epubshare|bookfi|b-ok\b/i, /^[\d][\d\s\-xX]{8,19}$/, /^[a-z0-9][a-z0-9-]*\.(com|org|net|io|ru|se|is|to|cc)$/i,
+  /^(epub|pdf|mobi|azw3|retail|scan|ocr|calibre|v\d+(\.\d+)?)$/i];
+const isJunk = s => { const t = (s || '').trim(); return !t || JUNK.some(r => r.test(t)); };
+const tidySeg = s => (s || '').replace(/\s*\[[^\]]*\]\s*/g, ' ').replace(/\s*[(（][^)）]*(z-?lib|anna|archive|oceanof|libgen)[^)）]*[)）]/ig, '')
+  .replace(/\s{2,}/g, ' ').replace(/^[\s,;·・]+|[\s,;·・-]+$/g, '').trim();
+function guessMeta(filename) {
+  let base = filename.replace(/\.(epub|pdf|txt)$/i, '').trim()
+    .replace(/^\d{1,3}\s*[.\-_)\]]\s*/, '').replace(/_+/g, ' ').replace(/\s{2,}/g, ' ').trim()
+    .replace(/\s*[(（\[][^)）\]]*(z-?lib|anna\s*['’`]?\s*s?\s*archive|oceanof|libgen|b-ok)[^)）\]]*[)）\]]/ig, '').trim();
+  let title = base, author = '', m;
+  if (/\s*--\s*/.test(base)) {
+    const segs = base.split(/\s*--\s*/).map(tidySeg).filter(x => x && !isJunk(x));
+    if (segs.length) { title = segs[0]; author = segs[1] || ''; }
+  } else {
+    if ((m = base.match(/^\[([^\]]{1,30})\]\s*(.+)$/))) { author = m[1]; title = m[2]; }
+    else if ((m = base.match(/^(.+?)\s+[-–—]\s+(.+)$/))) {
+      const a = m[1].trim(), b = m[2].trim();
+      if (a.length <= 22 && b.length >= a.length) { author = a; title = b; } else { title = a; author = b.length <= 22 ? b : ''; }
+    } else if ((m = base.match(/^(.+?)\s*[(（]([^)）]{2,25})[)）]\s*$/)) && !/판|쇄|권|vol|edition|개정/i.test(m[2])) { title = m[1].trim(); author = m[2].trim(); }
+    title = tidySeg(title); author = tidySeg(author);
+  }
+  if (isJunk(author)) author = '';
+  return { title: title.trim() || base, author: author.trim() };
+}
+
 /* ================= device niceties ================= */
 let wake = null;
 async function requestWake() { try { wake = await navigator.wakeLock?.request('screen'); } catch {} }
@@ -1612,6 +2010,8 @@ if ('launchQueue' in window) launchQueue.setConsumer(async p => { if (p.files?.l
 })();
 
 renderLibrary();
+loadGIS().catch(() => {}); // ready before the first tap, so the sign-in popup isn't blocked
+if (G.on) syncNow().then(() => { renderLibrary(); if (Date.now() - G.listAt > 5 * 60000) scanDrive(); });
 </script>
 </body>
 </html>
