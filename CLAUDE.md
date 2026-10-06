@@ -34,14 +34,14 @@ storage(IndexedDB `yeobaek`: books/files/state, 실패 시 메모리) → settin
 - **사전**: 사용자의 Apps Script 중계(`DEFAULT_RELAY`) → 표준국어대사전(`src=stdict`)·Merriam-Webster(`mw`, `mwth`). 없으면 위키낱말사전. 결과는 출처별로 도착하는 대로 표시하고 기기에 캐시(`yb-lk`).
 - **번역**: Chrome 내장 Translator(기기 안) → 중계 `src=tr`(Apps Script `LanguageApp`, 사용자가 아직 안 붙였을 수 있음, 하루 한 번 지원 여부 확인) → MyMemory. 기본 방향은 **영어→한국어, 한국어→영어** 고정, 프랑스어는 그때그때 선택.
 - 번역·사전·메모 창(`#pop`)은 **선택한 글 옆**에 화살표와 함께 뜬다(넓은 화면). 좁으면 위/아래.
-- **터치 선택은 앱이 직접 관리**(`TS.range`, `setTouchRange`, `.tsel-rect`로 칠함). 터치 기기에서는 본문 `user-select:none`이고 0.3초 길게 누르면 그 순간 낱말 선택을 확정한다. 브라우저 선택을 쓰면 안드로이드 Chrome이 자기 손잡이·메뉴를 띄우고, 오래 누르면 터치를 가져가(pointercancel) 선택이 사라졌기 때문. 선택을 읽을 때는 항상 `curRange()`/`selText()`/`clearSel()`을 쓸 것.
+- **터치 선택은 앱이 직접 관리**(`TS.range`, `setTouchRange`, `.tsel-rect`로 칠함). 터치 기기에서는 본문 `user-select:none`이고 0.3초 길게 누르면 그 순간 낱말 선택을 확정한다. 브라우저 선택을 쓰면 안드로이드 Chrome이 자기 손잡이·메뉴를 띄우고, 오래 누르면 터치를 가져가(pointercancel) 선택이 사라졌기 때문. 선택을 읽을 때는 항상 `curRange()`/`selText()`/`clearSel()`을 쓸 것. 칠(`.tsel-rect`)은 `#reader` 안에 그린다(body에 그리면 책 화면에 가려졌음).
 - 오른쪽 클릭(맥)은 브라우저 메뉴 대신 여백 메뉴만.
-- 어두운 지면에서는 하이라이트를 진한 형광펜 색 + 어두운 글자(`--hl-ink`)로. 반투명이면 갈색으로 보였음.
+- 어두운 지면에서는 하이라이트를 진한 형광펜 색 + 어두운 글자(`--hl-ink`)로(`#reader.darkpage`, 실제 바탕 밝기로 판단). 반투명이면 갈색으로 보였음. `<meta name="color-scheme" content="light dark">`로 브라우저의 강제 다크를 막는다. 안드로이드 Chrome의 '사이트에 어두운 테마 적용'이 켜져 있으면 노랑이 겨자·갈색으로 보인다.
 - 서재: Apple Books식 사이드바(전체·읽는 중·다 읽음·표시한 책·PDF·나의 컬렉션). 표지를 컬렉션으로 끌어다 놓기(마우스는 바로, 터치는 길게). 표지 이미지는 `draggable=false`(브라우저 이미지 끌기가 우리 끌기를 취소했었음). PDF 표지엔 빨간 모서리 띠.
 
 ## 꼭 지킬 것 (실수했던 것들)
 
-- **앱을 고치면 `sw.js`의 `CACHE` 이름을 올린다**(`mylibrary-vN`). 안 올리면 설치된 앱에 반영이 늦다.
+- **앱을 고치면 `sw.js`의 `CACHE`(`mylibrary-vN`)와 `index.html`의 `APP_VERSION`(`vN`)을 같이 올린다.** 안 올리면 설치된 앱에 반영이 늦다. 사이드바 아래에 버전이 보여서, 폰이 최신인지 사용자와 확인할 수 있다.
 - **manifest의 `id`는 `/my-library/` 그대로.** `"./"`는 사이트 맨 앞(`/`)으로 해석되어, 같은 사이트의 **원어 성경 앱**(`/biblical-language-study-app/`, id `"./"`)과 같은 앱으로 인식됐다(Chrome이 "이름 업데이트"를 띄우고 원어 성경으로 열려 함). 원어 성경 쪽 id는 설치된 앱이 깨지지 않게 그대로 둔다.
 - 서비스 워커는 앱 파일·글꼴·cdnjs만 캐시한다. 번역·사전 API를 캐시하면 다른 검색어에 예전 결과가 나왔다(`ignoreSearch` 사고).
 - PDF 그리기(canvas)는 기다리지 않는다(`R.pdfDrawn`). 창이 가려져 있으면 그리기가 멈춰 열기가 멈췄었다. PDF 표지 생성은 6초 제한(`withTimeout`).

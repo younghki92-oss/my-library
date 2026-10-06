@@ -67,6 +67,7 @@ svg.i{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.7;stro
 .side-item[aria-current="true"]{background:color-mix(in srgb,var(--ink) 10%,transparent);font-weight:600}
 .side-item.drop-on{background:var(--accent-soft);box-shadow:inset 0 0 0 2px var(--accent)}
 .side-item.add{color:var(--muted)}
+.side-foot .ver{font-size:11px;color:var(--muted);padding-left:6px;font-variant-numeric:tabular-nums}
 .side-foot{margin-top:auto;padding-top:14px;display:flex;flex-direction:column;gap:8px;align-items:flex-start}
 #libMain{min-width:0;padding-inline:clamp(16px,4vw,48px);padding-block:calc(env(safe-area-inset-top,0px) + 26px) 56px}
 .main-head{display:flex;align-items:center;gap:12px;margin-bottom:22px;flex-wrap:wrap}
@@ -311,7 +312,7 @@ mark.pend{background:var(--hl-yellow);color:inherit;outline:1.5px dashed var(--a
 /* touch: the reader does its own selection (no Android selection toolbar) */
 #reader.touchsel #content{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
 #reader.touchsel.tsel-on #content{-webkit-user-select:text;user-select:text}
-.tsel-rect{position:fixed;z-index:5;background:rgba(66,133,244,.30);border-radius:2px;pointer-events:none}
+.tsel-rect{position:fixed;z-index:4;background:rgba(66,133,244,.38);border-radius:2px;pointer-events:none}
 .lp-hint{position:fixed;z-index:6;background:var(--accent-soft);outline:2px solid var(--accent);border-radius:3px;pointer-events:none;animation:fade .12s}
 #pop{position:fixed;z-index:31;width:min(380px,calc(100vw - 24px));max-height:min(52vh,460px);display:flex;flex-direction:column;background:var(--r-panel);color:var(--r-fg);border:1px solid var(--r-rule);border-radius:14px;box-shadow:0 12px 36px rgba(0,0,0,.28);animation:fade .15s;box-sizing:border-box}
 #pop[data-side]::before{content:"";position:absolute;top:calc(var(--ay,40px) - 8px);width:15px;height:15px;background:var(--r-panel);border:1px solid var(--r-rule);transform:rotate(45deg)}
@@ -377,6 +378,7 @@ mark.pend{background:var(--hl-yellow);color:inherit;outline:1.5px dashed var(--a
       <button class="drive-chip" id="driveBtn"><span class="dot"></span><span id="driveTxt">Google Drive 연결</span></button>
       <button class="btn" id="addBtn" hidden><svg class="i" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>파일 추가</button>
       <button class="btn" id="installBtn" hidden>앱으로 설치</button>
+      <span class="ver" id="appVer"></span>
       <input type="file" id="fileIn" multiple accept=".epub,.txt,.pdf,application/epub+zip,text/plain,application/pdf" hidden>
     </div>
   </aside>
@@ -1439,7 +1441,7 @@ function paintTsel() {
     if (!x.width) continue;
     const d = Object.assign(document.createElement('div'), { className: 'tsel-rect' });
     Object.assign(d.style, { left: x.left + 'px', top: x.top + 'px', width: x.width + 'px', height: x.height + 'px' });
-    document.body.appendChild(d); TS.rects.push(d);
+    reader.appendChild(d); TS.rects.push(d);
   }
 }
 function setTouchRange(r) {
@@ -2878,6 +2880,8 @@ function syncThemeColor() {
 }
 new MutationObserver(syncThemeColor).observe(reader, { attributes: true, attributeFilter: ['hidden', 'data-rt'] });
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => setTimeout(syncThemeColor, 50));
+const APP_VERSION = 'v7';
+$('#appVer').textContent = 'My Library ' + APP_VERSION;
 renderLibrary();
 syncThemeColor();
 loadGIS().catch(() => {}); // ready before the first tap, so the sign-in popup isn't blocked
