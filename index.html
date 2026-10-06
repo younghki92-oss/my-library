@@ -270,6 +270,24 @@ input[type=range]{width:100%;accent-color:var(--accent);margin:0}
 #memoText{width:100%;box-sizing:border-box;min-height:140px;border:1px solid var(--r-rule);border-radius:10px;padding:12px;font:inherit;font-size:15px;line-height:1.6;background:var(--r-bg);color:var(--r-fg);resize:vertical}
 .row{display:flex;justify-content:flex-end;gap:8px;margin-top:12px}
 
+/* PDF pages */
+.pdf-wrap{display:flex;justify-content:center;align-items:flex-start;gap:16px;min-height:100%}
+#reader.pdf:not(.fitw) .pdf-wrap{align-items:center;height:100%}
+.pdf-page{position:relative;flex:none;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.18),0 6px 20px rgba(0,0,0,.12)}
+.pdf-page canvas{position:absolute;inset:0;width:100%;height:100%}
+.pdf-marks{position:absolute;inset:0;z-index:1;pointer-events:none}
+.pmark{position:absolute;border-radius:2px;mix-blend-mode:multiply}
+.pmark.hl.c-yellow{background:rgba(255,200,40,.45)} .pmark.hl.c-green{background:rgba(80,190,110,.38)} .pmark.hl.c-blue{background:rgba(80,140,255,.34)}
+.pmark.hl.c-pink{background:rgba(255,100,145,.34)} .pmark.hl.c-purple{background:rgba(150,100,240,.34)} .pmark.hl.c-orange{background:rgba(255,145,50,.4)}
+.pmark.ul{background:none;border-bottom:2px solid var(--ul-red);border-radius:0;mix-blend-mode:normal}
+.pmark.has-note{box-shadow:inset 0 -1.5px 0 rgba(0,0,0,.45)}
+.pmark.pend{background:var(--accent-soft);outline:1.5px dashed var(--accent);mix-blend-mode:normal}
+.textLayer{position:absolute;inset:0;overflow:hidden;line-height:1;opacity:1;text-align:initial;-webkit-text-size-adjust:none;text-size-adjust:none;forced-color-adjust:none;transform-origin:0 0;z-index:2;word-break:normal}
+.textLayer span,.textLayer br{color:transparent;position:absolute;white-space:pre;cursor:text;transform-origin:0% 0%}
+.textLayer ::selection{background:rgba(52,70,168,.28)}
+#reader.pdf #page{overflow:hidden}
+#reader.pdf.fitw #page{overflow-y:auto;overscroll-behavior:contain}
+.pdf-loading{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#888;font-size:13px}
 #selbar{position:fixed;z-index:30;display:flex;flex-direction:column;gap:3px;padding:5px;border-radius:12px;background:var(--r-fg);color:var(--r-bg);box-shadow:0 8px 24px rgba(0,0,0,.25);animation:fade .15s}
 #selbar button{border:0;background:none;color:inherit;cursor:pointer;height:36px;min-width:36px;border-radius:8px;display:inline-flex;align-items:center;justify-content:center;font-size:13px;padding:0 8px}
 #selbar button:hover{background:color-mix(in srgb,var(--r-bg) 16%,transparent)}
@@ -341,7 +359,7 @@ mark.pend{background:var(--hl-yellow);color:inherit;outline:1.5px dashed var(--a
       <button class="drive-chip" id="driveBtn"><span class="dot"></span><span id="driveTxt">Google Drive 연결</span></button>
       <button class="btn" id="addBtn" hidden><svg class="i" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>파일 추가</button>
       <button class="btn" id="installBtn" hidden>앱으로 설치</button>
-      <input type="file" id="fileIn" multiple accept=".epub,.txt,application/epub+zip,text/plain" hidden>
+      <input type="file" id="fileIn" multiple accept=".epub,.txt,.pdf,application/epub+zip,text/plain,application/pdf" hidden>
     </div>
   </aside>
   <div id="sideScrim"></div>
@@ -455,7 +473,7 @@ const FONTS = {
 };
 const MARGINS = ['clamp(16px,4vw,32px)', 'clamp(20px,6vw,64px)', 'clamp(28px,11vw,120px)'];
 const THEMES = [['auto', '자동', 'linear-gradient(135deg,#FCFCFA 50%,#16181D 50%)'], ['paper', '종이', '#FFFFFF'], ['sepia', '세피아', '#F2E9D8'], ['night', '밤', '#0F1114']];
-const DEFAULTS = { font: 'gowun', size: 19, lh: 1.8, margin: 1, theme: 'auto', mode: 'paged', justify: true, spread: 'auto', cpm: 500 };
+const DEFAULTS = { font: 'gowun', size: 19, lh: 1.8, margin: 1, theme: 'auto', mode: 'paged', justify: true, spread: 'auto', cpm: 500, pdfFit: 'page' };
 const S = Object.assign({}, DEFAULTS, ls.get('yb-settings', {}));
 if (typeof S.spread === 'boolean') S.spread = S.spread ? 'auto' : 'never';
 const saveSettings = () => ls.set('yb-settings', S);
@@ -719,9 +737,9 @@ async function libraryBooks() {
   const metas = (await store.all('books')).filter(Boolean);
   const local = metas.filter(m => !isDrive(m.id));
   const dmeta = new Map(metas.filter(m => isDrive(m.id)).map(m => [m.id, m]));
-  const drive = G.on ? G.list.filter(f => /\.(epub|txt)$/i.test(f.name)).map(f => {
+  const drive = G.on ? G.list.filter(f => /\.(epub|txt|pdf)$/i.test(f.name)).map(f => {
     const id = 'd:' + f.id, m = dmeta.get(id) || {}, g = guessMeta(f.name);
-    return { id, source: 'drive', file: f, format: /\.txt$/i.test(f.name) ? 'txt' : 'epub',
+    return { id, source: 'drive', file: f, format: fmtOf(f.name),
       title: m.title || g.title, author: m.title ? (m.author || '') : g.author, cover: m.cover, coverType: m.coverType,
       cached: !!m.cachedMt && m.cachedMt === f.modifiedTime, addedAt: Date.parse(f.modifiedTime) || 0 };
   }) : [];
@@ -775,7 +793,7 @@ async function renderLibrary() {
   </article>`).join('') || `<p class="empty">${q ? `‘${esc(LIB.q)}’와(과) 맞는 책이 없어요.` : col ? '아직 비어 있어요. 서재의 표지를 왼쪽의 이 컬렉션으로 끌어다 놓거나, 책의 ⋯에서 넣을 수 있어요.' : '이 목록에 책이 없어요.'}</p>`;
   $('#addBtn').hidden = G.on;
   $('#libHint').innerHTML = G.on
-    ? 'Google Drive 책 폴더의 EPUB·TXT가 이 서재에 보여요. 표지를 왼쪽 컬렉션으로 끌어다 놓아 정리할 수 있어요.<br>읽은 위치, 하이라이트, 컬렉션은 Drive를 통해 다른 기기와 맞춰져요.'
+    ? 'Google Drive 책 폴더의 EPUB·PDF·TXT가 이 서재에 보여요. 표지를 왼쪽 컬렉션으로 끌어다 놓아 정리할 수 있어요.<br>읽은 위치, 하이라이트, 컬렉션은 Drive를 통해 다른 기기와 맞춰져요.'
     : 'EPUB·TXT 파일을 이 창에 끌어다 놓거나 ‘책 추가’를 누르세요. 가져온 책은 이 기기에만 저장돼요.<br>‘Google Drive 연결’을 누르면 Drive 책 폴더를 서재로 쓰고, 다른 기기와 읽은 위치·하이라이트를 맞출 수 있어요.';
   updateDriveChip();
   LIB.books = books;
@@ -848,9 +866,13 @@ async function importFiles(files) {
         const b = await loadEpub(buf);
         meta = { id, format: 'epub', title: b.title, author: b.author, addedAt: Date.now() };
         const cv = await b.coverData().catch(() => null); if (cv) { meta.cover = cv.buf; meta.coverType = cv.type; }
+      } else if (ext === 'pdf' || f.type === 'application/pdf') {
+        const b = await loadPdf(buf, f.name), g = guessMeta(f.name);
+        meta = { id, format: 'pdf', title: g.title, author: g.author || b.author, addedAt: Date.now() };
+        const cv = await b.coverData().catch(() => null); if (cv) { meta.cover = cv.buf; meta.coverType = cv.type; }
       } else if (ext === 'txt' || f.type.startsWith('text/')) {
         meta = { id, format: 'txt', title: f.name.replace(/\.txt$/i, ''), author: '', addedAt: Date.now() };
-      } else { toast(`${f.name}: EPUB나 TXT 파일만 열 수 있어요`); continue; }
+      } else { toast(`${f.name}: EPUB, PDF, TXT 파일만 열 수 있어요`); continue; }
       await store.put('files', id, buf); await store.put('books', id, meta);
       lastId = id; added++;
     } catch (err) { console.error(err); toast(`${f.name}을(를) 열지 못했어요. 손상되지 않은 EPUB인지 확인해 주세요.`); }
@@ -880,13 +902,13 @@ async function openBook(id) {
       }
       if (!buf) return toast('Drive에 연결한 뒤 다시 열어 주세요');
       const name = f?.name || m.name || '';
-      const fmt = /\.txt$/i.test(name) ? 'txt' : 'epub';
-      book = fmt === 'txt' ? loadTxt(buf, guessMeta(name).title) : await loadEpub(buf);
+      const fmt = fmtOf(name);
+      book = fmt === 'txt' ? loadTxt(buf, guessMeta(name).title) : fmt === 'pdf' ? await loadPdf(buf, name) : await loadEpub(buf);
       if (!m.title) { // first open: keep the EPUB's own title, author and cover for the shelf
         const g = guessMeta(name);
         m.title = fmt === 'epub' && book.title && book.title !== '제목 없음' ? book.title : g.title;
-        m.author = fmt === 'epub' ? book.author || g.author : g.author;
-        const cv = fmt === 'epub' ? await book.coverData().catch(() => null) : null;
+        m.author = fmt === 'epub' ? book.author || g.author : g.author || book.author || '';
+        const cv = fmt !== 'txt' ? await book.coverData().catch(() => null) : null;
         if (cv) { m.cover = cv.buf; m.coverType = cv.type; }
       }
       m.name = name;
@@ -898,7 +920,7 @@ async function openBook(id) {
       if (!meta) return toast('책을 찾을 수 없어요');
       const buf = await store.get('files', id);
       if (!buf) return toast('책 파일을 찾을 수 없어요. 다시 추가해 주세요.');
-      book = meta.format === 'txt' ? loadTxt(buf, meta.title) : await loadEpub(buf);
+      book = meta.format === 'txt' ? loadTxt(buf, meta.title) : meta.format === 'pdf' ? await loadPdf(buf, meta.title) : await loadEpub(buf);
     }
     Object.assign(R, { anchor: null, book, id, meta, lens: null, texts: null, total: 0, ch: 0, page: 0 });
     R.st = (await store.get('state', id)) || (id === 'sample' ? sampleState() : { loc: { ch: 0, block: 0 }, highlights: [], bookmarks: [] });
@@ -910,6 +932,7 @@ async function openBook(id) {
     await renderChapter(R.st.loc?.ch || 0, { block: R.st.loc?.block || 0 }, false);
     requestWake(); relayWarm();
     indexBook(book);
+    applyLegacy();
   } catch (err) {
     console.error(err);
     toast(isDrive(id) && /fetch|download|401|403|token|popup/i.test(err.message || '') ? 'Drive에서 책을 받지 못했어요. 연결 상태를 확인해 주세요.' : '책을 여는 중 문제가 생겼어요: ' + (err.message || err));
@@ -942,13 +965,15 @@ async function indexBook(book) {
     if (i % 3 === 2) await new Promise(r => setTimeout(r));
   }
   if (R.book !== book) return;
-  Object.assign(R, { texts, lens, total: lens.reduce((a, b) => a + b, 0) });
+  Object.assign(R, { texts, lens, total: lens.reduce((a, b) => a + b, 0), hay: null });
+  if (R.legacyPending) applyLegacy();
   updateChrome(); scheduleSave();
 }
 
 /* ================= rendering & pagination ================= */
 let renderToken = 0;
 async function renderChapter(ch, target = {}, animate = true) {
+  if (R.book?.isPdf) return renderPdf(ch, target, animate);
   const tok = ++renderToken;
   ch = clamp(ch, 0, R.book.chapters.length - 1);
   const frag = await R.book.getHTML(ch);
@@ -975,12 +1000,14 @@ async function renderChapter(ch, target = {}, animate = true) {
 }
 // two pages side by side: "auto" picks it for wide, near-square-or-wider screens (an unfolded Fold, a laptop window)
 function wantSpread() {
-  if (S.mode !== 'paged' || S.spread === 'never') return false;
+  if (R.book?.isPdf ? S.pdfFit === 'width' : S.mode !== 'paged') return false;
+  if (S.spread === 'never') return false;
   const w = reader.clientWidth, h = reader.clientHeight || 1;
   return S.spread === 'always' ? w >= 520 : w >= 760 && w / h >= 0.72;
 }
 function updateSpread() { reader.classList.toggle('spread', wantSpread()); }
 function layout() {
+  if (R.book?.isPdf) return;
   const W = page.clientWidth, H = page.clientHeight;
   content.style.setProperty('--page-h', H + 'px');
   if (S.mode === 'paged') {
@@ -1039,6 +1066,7 @@ function goPage(p, animate = true) {
 function afterMove() { if (!R.relaying) R.anchor = currentAnchor(); if (R.edit) positionHandles(); updateChrome(); scheduleSave(); }
 async function next() {
   hideSelbar(); hideHandles(); closePop();
+  if (R.book.isPdf) return pdfTurn(1);
   const last = R.ch >= R.book.chapters.length - 1;
   if (S.mode === 'paged') {
     if (R.page < R.pages - 1) goPage(R.page + 1);
@@ -1053,6 +1081,7 @@ async function next() {
 }
 async function prev() {
   hideSelbar(); hideHandles(); closePop();
+  if (R.book.isPdf) return pdfTurn(-1);
   if (S.mode === 'paged') {
     if (R.page > 0) goPage(R.page - 1);
     else if (R.ext) { goPage(0); toast('같은 장 안에서만 이어서 칠할 수 있어요'); }
@@ -1068,6 +1097,10 @@ let relayT;
 function scheduleRelayout() { clearTimeout(relayT); relayT = setTimeout(relayout, 120); }
 function relayout() {
   if (!R.book || reader.hidden) return;
+  if (R.book.isPdf) { // re-draw the pages only when the space for them changed
+    if (pdfSizeKey() !== R.pdfSize) renderPdf(R.ch, {}, false);
+    return;
+  }
   const a = R.anchor ?? currentAnchor();
   R.relaying = true; updateSpread(); layout(); goTarget({ block: a }); R.relaying = false;
   if (R.edit) positionHandles();
@@ -1098,12 +1131,13 @@ function updateChrome() {
   if (!R.book) return;
   const f = bookFraction(), cf = chapterFraction(), pct = Math.round(f * 100);
   $('#runTitle').textContent = chTitle(R.ch);
-  $('#footLeft').textContent = S.mode === 'paged' ? `${R.page + 1} / ${R.pages}` : `${Math.round(cf * 100)}%`;
-  $('#footRight').textContent = R.lens ? `이 장 ${fmtMin(R.lens[R.ch] * (1 - cf))} 남음` : '';
+  const n = R.book.chapters.length, pdf = R.book.isPdf, shown = pdf ? pdfShown() : null;
+  $('#footLeft').textContent = pdf ? `${shown.map(i => i + 1).join('–')} / ${n}` : S.mode === 'paged' ? `${R.page + 1} / ${R.pages}` : `${Math.round(cf * 100)}%`;
+  $('#footRight').textContent = !pdf && R.lens ? `이 장 ${fmtMin(R.lens[R.ch] * (1 - cf))} 남음` : '';
   $('#seekCh').textContent = chTitle(R.ch);
   $('#seekPct').textContent = pct + '%';
   $('#seekLeft').textContent = R.lens ? `다 읽기까지 ${fmtMin(R.total * (1 - f))}` : '분량 계산 중…';
-  $('#seekPage').textContent = `${R.ch + 1}장 / ${R.book.chapters.length}장`;
+  $('#seekPage').textContent = pdf ? `${R.ch + 1}쪽 / ${n}쪽` : `${R.ch + 1}장 / ${n}장`;
   if (!R.seeking) $('#seek').value = Math.round(f * 1000);
   updateBookmark();
 }
@@ -1113,7 +1147,7 @@ function scheduleSave() { clearTimeout(saveT); saveT = setTimeout(saveNow, 450);
 const canon = o => JSON.stringify(o, (k, v) => v && typeof v === 'object' && !Array.isArray(v) ? Object.fromEntries(Object.keys(v).sort().map(x => [x, v[x]])) : v);
 function stampItems(st) { // give every highlight/bookmark a modified time when its content changes
   for (const x of [...(st.highlights || []), ...(st.bookmarks || [])]) {
-    const sig = canon([x.s, x.e, x.color, x.kind, x.note, x.b, x.ch]);
+    const sig = canon([x.s, x.e, x.rects, x.color, x.kind, x.note, x.b, x.ch]);
     if (x.sig !== sig) { x.sig = sig; x.mt = Date.now(); }
   }
 }
@@ -1142,6 +1176,7 @@ page.addEventListener('scroll', () => { if (S.mode !== 'scroll' || scrollRAF) re
 
 /* ================= bookmarks ================= */
 function onCurrentPage(bm) {
+  if (R.book?.isPdf) return pdfShown().includes(bm.ch);
   if (bm.ch !== R.ch) return false;
   const el = R.blocks[bm.b]; if (!el) return false;
   if (S.mode === 'paged') return pageOfEl(el) === R.page;
@@ -1155,7 +1190,7 @@ function updateBookmark() {
 $('#bmBtn').onclick = () => {
   const hit = R.st.bookmarks.filter(onCurrentPage);
   if (hit.length) { R.st.bookmarks = R.st.bookmarks.filter(b => !hit.includes(b)); hit.forEach(b => bury(b.id)); toast('책갈피를 뺐어요'); }
-  else { const b = currentAnchor(); R.st.bookmarks.push({ id: uid('k'), ch: R.ch, b, text: (R.blocks[b]?.textContent || '').trim().slice(0, 90), at: Date.now() }); toast('책갈피를 꽂았어요'); }
+  else { const b = currentAnchor(); R.st.bookmarks.push({ id: uid('k'), ch: R.ch, b, text: R.book.isPdf ? `${R.ch + 1}쪽` : (R.blocks[b]?.textContent || '').trim().slice(0, 90), at: Date.now() }); toast('책갈피를 꽂았어요'); }
   updateBookmark(); saveNow();
 };
 
@@ -1193,12 +1228,13 @@ const unwrap = m => { const p = m.parentNode; if (!p) return; while (m.firstChil
 /* annotations: kind 'hl' = colored highlight, kind 'ul' = red underline (can sit on top of a highlight) */
 const markClass = h => (h.kind === 'ul' ? 'ann ul' : `ann hl c-${h.color}`) + (h.note ? ' has-note' : '');
 function applyHighlight(h) {
+  if (h.pdf) return paintPdfMark(h);
   if (h.ch !== R.ch) return [];
   const sp = posToPoint(h.s), ep = posToPoint(h.e); if (!sp || !ep) return [];
   return wrapRange(sp, ep, () => { const m = document.createElement('mark'); m.className = markClass(h); m.dataset.hid = h.id; return m; });
 }
 const findH = id => R.st.highlights.find(h => h.id === id);
-const marksOf = id => $$(`mark[data-hid="${CSS.escape(id)}"]`, content);
+const marksOf = id => $$(`[data-hid="${CSS.escape(id)}"]`, content);
 const rangeText = (s, e) => (pointsToRange(s, e)?.toString() || '').trim().slice(0, 1200);
 function addAnnotation(kind, color, s, e) {
   const h = { id: uid('h'), kind, ch: R.ch, s, e, color: kind === 'ul' ? 'red' : color, text: rangeText(s, e), note: '', at: Date.now() };
@@ -1206,6 +1242,12 @@ function addAnnotation(kind, color, s, e) {
   return h;
 }
 function createAnnotation(kind, color = 'yellow') {
+  if (R.book?.isPdf) {
+    const rects = pdfRectsFromSelection(), text = getSelection().toString();
+    if (!rects) { toast('PDF의 글자를 선택해 주세요'); return null; }
+    getSelection().removeAllRanges();
+    return addPdfAnnotation(kind, color, rects, text);
+  }
   const p = selectionPos();
   if (!p) { toast('본문 문장을 선택해 주세요'); return null; }
   getSelection().removeAllRanges();
@@ -1219,6 +1261,10 @@ function deleteH(id) {
 }
 const overlaps = (a, b) => cmpPos(a.s, b.e) < 0 && cmpPos(b.s, a.e) < 0;
 function ctxOf(h) { // the highlight and underline that share this spot
+  if (h.pdf) {
+    const same = k => R.st.highlights.find(x => x !== h && x.pdf && (x.kind || 'hl') === k && canon(x.rects) === canon(h.rects)) || null;
+    return h.kind === 'ul' ? { hl: same('hl'), ul: h } : { hl: h, ul: same('ul') };
+  }
   const other = k => R.st.highlights.find(x => x !== h && x.ch === h.ch && (x.kind || 'hl') === k && overlaps(x, h)) || null;
   return h.kind === 'ul' ? { hl: other('hl'), ul: h } : { hl: h, ul: other('ul') };
 }
@@ -1228,7 +1274,7 @@ const hS = $('#hS'), hE = $('#hE');
 let hdrag = null;
 function annRects(id) { const out = []; for (const m of marksOf(id)) for (const r of m.getClientRects()) if (r.width) out.push(r); return out; }
 function positionHandles() {
-  if (!R.edit) { hS.hidden = hE.hidden = true; return; }
+  if (!R.edit || findH(R.edit.id)?.pdf) { hS.hidden = hE.hidden = true; return; } // PDF marks have no drag handles
   const rs = annRects(R.edit.id), pr = page.getBoundingClientRect();
   const vis = r => r && r.right > pr.left - 2 && r.left < pr.right + 2 && r.bottom > pr.top && r.top < pr.bottom;
   const place = (el, r, x) => {
@@ -1410,7 +1456,7 @@ const PALETTE = ['green', 'blue', 'pink', 'purple', 'orange'];
 const CNAME = { yellow: '노랑', green: '초록', blue: '파랑', pink: '분홍', purple: '보라', orange: '주황' };
 // true when the range ends on the last word of the page, i.e. the text right after it starts on the next page
 function atPageEnd(e) {
-  if (!e || S.mode !== 'paged' || R.page >= R.pages - 1) return false;
+  if (R.book?.isPdf || !e || S.mode !== 'paged' || R.page >= R.pages - 1) return false;
   const ep = posToPoint(e); if (!ep) return false;
   const cl = content.getBoundingClientRect().left;
   const pageAt = (node, off) => { const r = document.createRange(); r.setStart(node, off); r.setEnd(node, off + 1); const rc = r.getClientRects()[0]; return rc ? pageOfX(rc.left - cl) : -1; };
@@ -1435,7 +1481,7 @@ function showSelbar(rect, mode, hid = '', palette = false) {
   const cont = atPageEnd(h ? h.e : selectionPos()?.e) ? '<button data-act="extend">다음 쪽까지 ›</button>' : '';
   const picked = h ? h.text : getSelection().toString();
   const tools = '<button data-act="translate">번역</button>' + (isWordish(picked) ? '<button data-act="dict">사전</button>' : '');
-  const sub = palette ? '' : tools + (mode === 'new' ? '<button data-act="sentence">문장 전체</button><button data-act="para">문단 전체</button>' : '') + cont;
+  const sub = palette ? '' : tools + (mode === 'new' && !R.book?.isPdf ? '<button data-act="sentence">문장 전체</button><button data-act="para">문단 전체</button>' : '') + cont;
   selbar.innerHTML = row1 + (sub ? `<div class="sb-row sb-sub">${sub}</div>` : '');
   selbar.dataset.mode = mode; selbar.dataset.hid = hid; selbar.hidden = false; selbar._rect = rect;
   const bw = selbar.offsetWidth, bh = selbar.offsetHeight, gap = mode === 'edit' ? 24 : 12;
@@ -1461,13 +1507,13 @@ selbar.addEventListener('click', e => {
       return ctx.ul ? editAnnotation(ctx.ul.id) : (hideSelbar(), toast('하이라이트를 지웠어요'));
     }
     if (ctx.hl) { ctx.hl.color = c; refreshMarks(ctx.hl); saveNow(); }
-    else addAnnotation('hl', c, h.s, h.e);
+    else if (h.pdf) addPdfAnnotation('hl', c, h.rects, h.text); else addAnnotation('hl', c, h.s, h.e);
     return editAnnotation(h.id);
   }
   if (act === 'underline') {
     if (!h) { const n = createAnnotation('ul'); return n ? editAnnotation(n.id) : hideSelbar(); }
     if (ctx.ul) { deleteH(ctx.ul.id); return ctx.hl ? editAnnotation(ctx.hl.id) : (hideSelbar(), toast('밑줄을 지웠어요')); }
-    addAnnotation('ul', null, h.s, h.e);
+    if (h.pdf) addPdfAnnotation('ul', null, h.rects, h.text); else addAnnotation('ul', null, h.s, h.e);
     return editAnnotation(h.id);
   }
   if (act === 'memo') { const rect = selbar._rect, t = h || createAnnotation('hl', 'yellow'); if (t) { hideSelbar(); hideHandles(); return openPop('memo', t, rect); } }
@@ -1477,11 +1523,13 @@ selbar.addEventListener('click', e => {
   else if (act === 'para') expandParagraph();
   else if (act === 'extend') { hideSelbar(); startExtend(h ? h.id : null); return; }
   else if (act === 'translate' || act === 'dict') {
-    const p = h ? { s: h.s, e: h.e } : selectionPos();
+    const p = h ? { s: h.s, e: h.e } : R.book.isPdf ? {} : selectionPos();
     if (!p) return hideSelbar();
-    const text = (h ? h.text : rangeText(p.s, p.e)).trim();
+    const text = (h ? h.text : R.book.isPdf ? getSelection().toString() : rangeText(p.s, p.e)).trim();
+    if (!text) return hideSelbar();
+    p.rects = !h && R.book.isPdf ? pdfRectsFromSelection() : null;
     hideSelbar(); hideHandles(); getSelection().removeAllRanges();
-    return openPop(act, { ch: R.ch, s: p.s, e: p.e, hid: h?.id || null, text }, selbar._rect);
+    return openPop(act, { ch: R.ch, s: p.s, e: p.e, rects: p.rects, hid: h?.id || null, text }, selbar._rect);
   }
   hideSelbar();
   if (act !== 'sentence' && act !== 'para') hideHandles();
@@ -1497,7 +1545,7 @@ stage.addEventListener('contextmenu', e => {
   const sel = getSelection();
   const inSel = !sel.isCollapsed && sel.rangeCount && [...sel.getRangeAt(0).getClientRects()].some(r => e.clientX >= r.left - 2 && e.clientX <= r.right + 2 && e.clientY >= r.top - 2 && e.clientY <= r.bottom + 2);
   if (!inSel) {
-    const m = e.target.closest('mark.ann');
+    const m = e.target.closest('mark.ann') || (R.book?.isPdf && pdfMarkAt(e.clientX, e.clientY));
     if (m) { sel.removeAllRanges(); return editAnnotation(m.dataset.hid); }
     const c = caretAt(e.clientX, e.clientY);
     if (!c || c.node.nodeType !== 3) return;
@@ -1540,12 +1588,13 @@ function onTap(e) {
     return;
   }
   if (e.target.closest('#content a')) return;
-  const m = e.target.closest('mark.ann');
+  const m = e.target.closest('mark.ann') || (R.book?.isPdf && pdfMarkAt(e.clientX, e.clientY));
   if (m) { editAnnotation(m.dataset.hid); return; }
   if (!selbar.hidden || R.edit || POP.on) { hideSelbar(); hideHandles(); closePop(); return; }
   const x = e.clientX / innerWidth;
-  if (S.mode === 'paged' && x < .26) prev();
-  else if (S.mode === 'paged' && x > .74) next();
+  const zones = S.mode === 'paged' || R.book?.isPdf;
+  if (zones && x < .26) prev();
+  else if (zones && x > .74) next();
   else reader.classList.toggle('ui-hidden');
 }
 content.addEventListener('click', e => {
@@ -1557,7 +1606,7 @@ content.addEventListener('click', e => {
 });
 let wheelAcc = 0, wheelLock = false, wheelT;
 stage.addEventListener('wheel', e => {
-  if (S.mode !== 'paged' || e.ctrlKey) return;
+  if ((R.book?.isPdf ? S.pdfFit === 'width' : S.mode !== 'paged') || e.ctrlKey) return;
   e.preventDefault();
   clearTimeout(wheelT); wheelT = setTimeout(() => { wheelLock = false; wheelAcc = 0; }, 170);
   if (wheelLock) return;
@@ -1599,7 +1648,8 @@ const pop = $('#pop'), POP = { on: false, rect: null, marks: [] };
 function openPop(kind, arg, rect) {
   closeSheet();
   POP.on = true; POP.rect = rect;
-  if (kind !== 'memo' && arg.ch === R.ch) { // keep the looked-up words marked while the card is open
+  if (kind !== 'memo' && arg.rects) POP.marks = paintPdfMark({ id: '', rects: arg.rects, pend: true });
+  else if (kind !== 'memo' && arg.s && arg.ch === R.ch) { // keep the looked-up words marked while the card is open
     const sp = posToPoint(arg.s), ep = posToPoint(arg.e);
     if (sp && ep) POP.marks = wrapRange(sp, ep, () => Object.assign(document.createElement('mark'), { className: 'pend' }));
   }
@@ -1711,7 +1761,7 @@ function renderNotes() {
   body().onclick = async e => {
     const b = e.target.closest('button'); if (!b) return; const d = b.dataset;
     if (d.tab) { notesTab = d.tab; renderNotes(); }
-    else if (d.goH) { const h = findH(d.goH); closeSheet(); await renderChapter(h.ch, { block: h.s.b }); const m = marksOf(h.id)[0]; if (m && S.mode === 'paged') goPage(pageOfEl(m), false); }
+    else if (d.goH) { const h = findH(d.goH); closeSheet(); await renderChapter(h.ch, { block: h.s?.b }); const m = marksOf(h.id)[0]; if (m && S.mode === 'paged') goPage(pageOfEl(m), false); }
     else if (d.goB) { const k = R.st.bookmarks.find(x => x.id === d.goB); closeSheet(); renderChapter(k.ch, { block: k.b }); }
     else if (d.memo) { memoFrom = 'notes'; openSheet('memo', findH(d.memo)); }
     else if (d.clearMemo) { const h = findH(d.clearMemo); if (h) { h.note = ''; refreshMarks(h); saveNow(); toast('메모를 지웠어요'); } renderNotes(); }
@@ -1726,7 +1776,7 @@ function renderMemo(h) {
     <textarea id="memoText" placeholder="이 문장에 대한 생각을 적어 두세요"></textarea>
     <div class="row"><button class="btn" id="memoCancel">취소</button><button class="btn primary" id="memoSave">저장</button></div>`;
   $('#memoText').value = h.note || '';
-  setTimeout(() => $('#memoText').focus(), 60);
+  setTimeout(() => $('#memoText')?.focus(), 60);
   const from = memoFrom; memoFrom = null;
   const done = () => { if (POP.on) closePop(); else if (from === 'notes') { notesTab = h.note ? 'memo' : 'hl'; openSheet('notes'); } else closeSheet(); };
   $('#memoCancel').onclick = done;
@@ -1737,6 +1787,7 @@ function renderMemo(h) {
 function renderSettings() {
   const seg = (k, opts) => `<div class="seg">${opts.map(([v, l]) => `<button data-set="${k}" data-val="${v}" aria-pressed="${String(S[k]) === String(v)}">${l}</button>`).join('')}</div>`;
   body().innerHTML = `
+  ${R.book?.isPdf ? `<div class="field"><span class="lbl">PDF 화면 맞춤</span>${seg('pdfFit', [['page', '쪽 전체'], ['width', '폭에 맞춤']])}</div>` : ''}
   <div class="field"><span class="lbl">지면 색</span><div class="seg">${THEMES.map(([v, l, bg]) => `<button class="swatch" data-set="theme" data-val="${v}" aria-pressed="${S.theme === v}"><i style="background:${bg}"></i>${l}</button>`).join('')}</div></div>
   <div class="field"><span class="lbl">글꼴</span><div class="seg">${Object.entries(FONTS).map(([k, f]) => `<button class="fontbtn" data-set="font" data-val="${k}" aria-pressed="${S.font === k}"><b style="font-family:${esc(f.stack)}">가나다</b><small>${f.name}</small></button>`).join('')}</div></div>
   <div class="field"><span class="lbl">글자 크기</span><div class="stepper"><button data-step="size" data-d="-1" aria-label="작게">가−</button><output id="sizeOut">${S.size}px</output><button data-step="size" data-d="1" aria-label="크게">가+</button></div></div>
@@ -1765,6 +1816,7 @@ function changeSetting(k, v) {
   if (R.book) {
     if (k === 'mode') renderChapter(R.ch, { block: a }, false);
     else if (k === 'theme' || k === 'cpm') updateChrome();
+    else if (R.book.isPdf) renderPdf(R.ch, {}, false);
     else { R.relaying = true; layout(); goTarget({ block: a }); R.relaying = false; }
   }
   if (sheetKind === 'settings') {
@@ -1779,7 +1831,9 @@ function applySettings() {
   st.setProperty('--r-lh', S.lh);
   st.setProperty('--mx', MARGINS[S.margin] || MARGINS[1]);
   content.classList.toggle('justify', !!S.justify);
-  reader.classList.toggle('scroll', S.mode === 'scroll');
+  const pdf = !!R.book?.isPdf;
+  reader.classList.toggle('scroll', S.mode === 'scroll' && !pdf);
+  reader.classList.toggle('pdf', pdf); reader.classList.toggle('fitw', pdf && S.pdfFit === 'width');
   updateSpread();
 }
 
@@ -1801,7 +1855,8 @@ function detectLang(t) { // the reader's three languages: Korean, English, Frenc
 const isWordish = t => { t = (t || '').trim(); return t.length > 0 && t.length <= 40 && t.split(/\s+/).length <= 3; };
 function noteOn(arg, entry) { // append a line to the passage's note, highlighting it first if needed
   let h = arg.hid && findH(arg.hid);
-  if (!h && arg.ch === R.ch) { h = addAnnotation('hl', 'yellow', arg.s, arg.e); arg.hid = h.id; }
+  if (!h && arg.rects) { h = addPdfAnnotation('hl', 'yellow', arg.rects, arg.text); arg.hid = h.id; }
+  else if (!h && arg.s && arg.ch === R.ch) { h = addAnnotation('hl', 'yellow', arg.s, arg.e); arg.hid = h.id; }
   if (!h) return toast('이 문장이 있는 장을 펼친 뒤 저장해 주세요');
   h.note = h.note ? `${h.note}\n\n${entry}` : entry;
   refreshMarks(h); saveNow(); toast('메모에 저장했어요');
@@ -2072,6 +2127,236 @@ function renderDict(arg) {
   paint();
 }
 
+/* ================= PDF (pdf.js) ================= */
+const PDFJS = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+const PDFJS_WORKER = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+const fmtOf = name => (/\.txt$/i.test(name) ? 'txt' : /\.pdf$/i.test(name) ? 'pdf' : 'epub');
+function loadScript(src) {
+  return new Promise((res, rej) => { const sc = Object.assign(document.createElement('script'), { src }); sc.onload = res; sc.onerror = () => rej(new Error('script ' + src)); document.head.appendChild(sc); });
+}
+async function loadPdfJs() {
+  if (!window.pdfjsLib) {
+    await loadScript(PDFJS);
+    // a worker can't load cross-origin, so hand it the worker code as a local blob
+    const code = await fetch(PDFJS_WORKER).then(r => r.blob());
+    pdfjsLib.GlobalWorkerOptions.workerSrc = URL.createObjectURL(code);
+  }
+  return pdfjsLib;
+}
+async function loadPdf(buf, name) {
+  const lib = await loadPdfJs();
+  const doc = await lib.getDocument({ data: new Uint8Array(buf.slice(0)) }).promise;
+  const info = (await doc.getMetadata().catch(() => null))?.info || {};
+  const n = doc.numPages, toc = [];
+  const walk = async (items, depth) => {
+    for (const it of items || []) {
+      let ch = -1;
+      try { let dest = it.dest; if (typeof dest === 'string') dest = await doc.getDestination(dest); if (dest?.[0]) ch = await doc.getPageIndex(dest[0]); } catch {}
+      toc.push({ label: it.title, ch, depth });
+      if (depth < 2) await walk(it.items, depth + 1);
+    }
+  };
+  await walk(await doc.getOutline().catch(() => null), 0);
+  const pageText = async i => (await (await doc.getPage(i + 1)).getTextContent()).items.map(t => t.str + (t.hasEOL ? '\n' : '')).join('');
+  const getDoc = async i => { const d = document.createElement('div'); d.innerHTML = `<p>${esc(await pageText(i))}</p>`; return d; };
+  return {
+    isPdf: true, pdf: doc, title: guessMeta(name || '').title || info.Title || 'PDF', author: info.Author || '', lang: '',
+    chapters: Array.from({ length: n }, (_, i) => ({ path: 'p' + i })), toc, getDoc, getHTML: getDoc,
+    async coverData() { // first page, small
+      const pg = await doc.getPage(1), vp = pg.getViewport({ scale: 360 / pg.getViewport({ scale: 1 }).width });
+      const c = Object.assign(document.createElement('canvas'), { width: Math.round(vp.width), height: Math.round(vp.height) });
+      await pg.render({ canvasContext: c.getContext('2d'), viewport: vp }).promise;
+      const blob = await new Promise(r => c.toBlob(r, 'image/jpeg', 0.82));
+      return { buf: await blob.arrayBuffer(), type: 'image/jpeg' };
+    },
+  };
+}
+const pdfSizeKey = () => `${page.clientWidth}x${page.clientHeight}|${wantSpread()}|${S.pdfFit}`;
+function pdfShown() { // the page(s) on screen
+  const n = R.book.chapters.length;
+  return reader.classList.contains('spread') && R.ch + 1 < n ? [R.ch, R.ch + 1] : [R.ch];
+}
+async function renderPdf(ch, target = {}, animate = true) {
+  const tok = ++renderToken, n = R.book.chapters.length, lib = window.pdfjsLib;
+  updateSpread();
+  const spread = reader.classList.contains('spread');
+  ch = clamp(ch, 0, n - 1);
+  if (spread && ch % 2 === 1) ch -= 1; // pages pair up as 1–2, 3–4, …
+  R.ch = ch; R.edit = null; hS.hidden = hE.hidden = true; closePop(); hideSelbar();
+  Object.assign(content.style, { width: '', height: '', columnCount: '', columnGap: '', columnFill: '', transform: '', transition: '' });
+  Object.assign(R, { blocks: [], blockIdx: new Map(), pages: 1, page: 0, step: 0, anchor: 0 });
+  const pages = spread && ch + 1 < n ? [ch, ch + 1] : [ch];
+  R.pdfSize = pdfSizeKey();
+  const W = page.clientWidth, H = page.clientHeight, gap = 16, dpr = Math.min(devicePixelRatio || 1, 2.5);
+  const wrap = Object.assign(document.createElement('div'), { className: 'pdf-wrap' });
+  const jobs = [];
+  for (const pi of pages) {
+    const pg = await R.book.pdf.getPage(pi + 1);
+    if (tok !== renderToken) return;
+    const v1 = pg.getViewport({ scale: 1 }), availW = (W - gap * (pages.length - 1)) / pages.length;
+    const scale = S.pdfFit === 'width' ? availW / v1.width : Math.min(availW / v1.width, H / v1.height);
+    const vp = pg.getViewport({ scale });
+    const box = Object.assign(document.createElement('div'), { className: 'pdf-page' });
+    box.dataset.p = pi; Object.assign(box.style, { width: vp.width + 'px', height: vp.height + 'px' });
+    const canvas = Object.assign(document.createElement('canvas'), { width: Math.round(vp.width * dpr), height: Math.round(vp.height * dpr) });
+    const marks = Object.assign(document.createElement('div'), { className: 'pdf-marks' });
+    const text = Object.assign(document.createElement('div'), { className: 'textLayer' });
+    text.style.setProperty('--scale-factor', scale);
+    box.append(canvas, marks, text); wrap.appendChild(box);
+    jobs.push(pg.render({ canvasContext: canvas.getContext('2d'), viewport: vp, transform: dpr !== 1 ? [dpr, 0, 0, dpr, 0, 0] : null }).promise.catch(() => {}));
+    jobs.push(pg.getTextContent().then(tc => lib.renderTextLayer({ textContentSource: tc, container: text, viewport: vp, textDivs: [] }).promise).catch(() => {}));
+  }
+  if (tok !== renderToken) return;
+  content.replaceChildren(wrap);
+  page.scrollTop = target.end && S.pdfFit === 'width' ? page.scrollHeight : 0;
+  R.st.highlights.filter(h => h.pdf).forEach(paintPdfMark);
+  if (animate && !reduceMotion) content.animate([{ opacity: 0.4 }, { opacity: 1 }], { duration: 160, easing: 'ease-out' });
+  afterMove();
+  R.pdfDrawn = Promise.all(jobs); // drawing finishes in the background; callers don't wait for it
+}
+async function pdfTurn(dir) {
+  const n = R.book.chapters.length, step = reader.classList.contains('spread') ? 2 : 1;
+  if (S.pdfFit === 'width') { // read down the page first
+    const atEnd = page.scrollTop + page.clientHeight >= page.scrollHeight - 4, atTop = page.scrollTop <= 2;
+    if (dir > 0 && !atEnd) return page.scrollBy({ top: page.clientHeight * .88, behavior: reduceMotion ? 'auto' : 'smooth' });
+    if (dir < 0 && !atTop) return page.scrollBy({ top: -page.clientHeight * .88, behavior: reduceMotion ? 'auto' : 'smooth' });
+  }
+  const to = R.ch + dir * step;
+  if (to < 0) return toast('첫 쪽이에요');
+  if (to > n - 1 || (step === 2 && R.ch + 2 > n - 1 && dir > 0)) return toast('마지막 쪽이에요');
+  await renderPdf(to, { end: false }, true);
+  if (dir < 0 && S.pdfFit === 'width') page.scrollTop = page.scrollHeight;
+  reader.classList.add('ui-hidden');
+}
+// selection → rectangles relative to each page (0–1), merged per line
+function pdfRectsFromSelection() {
+  const sel = getSelection(); if (!sel.rangeCount || sel.isCollapsed) return null;
+  const boxes = $$('.pdf-page', content).map(b => [b, b.getBoundingClientRect()]), out = [];
+  for (const r of sel.getRangeAt(0).getClientRects()) {
+    if (r.width < 1 || r.height < 1) continue;
+    const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+    const hit = boxes.find(([, br]) => cx >= br.left && cx <= br.right && cy >= br.top && cy <= br.bottom); if (!hit) continue;
+    const [box, br] = hit;
+    out.push({ p: +box.dataset.p, x: (r.left - br.left) / br.width, y: (r.top - br.top) / br.height, w: r.width / br.width, h: r.height / br.height });
+  }
+  out.sort((a, b) => a.p - b.p || a.y - b.y || a.x - b.x);
+  const merged = [];
+  for (const r of out) {
+    const l = merged[merged.length - 1];
+    if (l && l.p === r.p && Math.abs(l.y - r.y) < l.h * 0.5 && r.x <= l.x + l.w + 0.012) {
+      const x2 = Math.max(l.x + l.w, r.x + r.w), y2 = Math.max(l.y + l.h, r.y + r.h);
+      l.y = Math.min(l.y, r.y); l.w = x2 - l.x; l.h = y2 - l.y;
+    } else merged.push({ ...r });
+  }
+  const f = v => Math.round(v * 1e4) / 1e4;
+  return merged.length ? merged.map(r => ({ p: r.p, x: f(r.x), y: f(r.y), w: f(r.w), h: f(r.h) })) : null;
+}
+function addPdfAnnotation(kind, color, rects, text) {
+  const h = { id: uid('h'), kind, pdf: true, ch: Math.min(...rects.map(r => r.p)), rects, color: kind === 'ul' ? 'red' : color, text: (text || '').trim().slice(0, 1200), note: '', at: Date.now() };
+  R.st.highlights.push(h); paintPdfMark(h); saveNow();
+  return h;
+}
+function paintPdfMark(h) {
+  const made = [];
+  for (const r of h.rects || []) {
+    const layer = content.querySelector(`.pdf-page[data-p="${r.p}"] .pdf-marks`); if (!layer) continue;
+    const d = document.createElement('div');
+    d.className = 'pmark ' + (h.pend ? 'pend' : markClass(h));
+    if (h.id) d.dataset.hid = h.id;
+    Object.assign(d.style, { left: r.x * 100 + '%', top: r.y * 100 + '%', width: r.w * 100 + '%', height: r.h * 100 + '%' });
+    layer.appendChild(d); made.push(d);
+  }
+  return made;
+}
+function pdfMarkAt(x, y) {
+  for (const m of $$('.pmark[data-hid]', content)) { const r = m.getBoundingClientRect(); if (x >= r.left && x <= r.right && y >= r.top - 2 && y <= r.bottom + 2) return m; }
+  return null;
+}
+
+/* ================= bringing over highlights from the old "서재" app ================= */
+// The old app kept its record in seojae-state.json in the same hidden Drive folder (same Google client).
+const OLD_COLORS = { '#F2D06B': 'yellow', '#9BD4A0': 'green', '#8FBCE8': 'blue', '#E8A0B4': 'pink' };
+async function fetchLegacy() {
+  if (!G.on || ls.get('yb-legacy-at', 0)) return;
+  try {
+    const q = encodeURIComponent("name='seojae-state.json'");
+    const r = await gapi(`https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=${q}&fields=files(id,modifiedTime)&orderBy=modifiedTime desc`);
+    if (!r.ok) return;
+    const books = {};
+    for (const f of (await r.json()).files || []) {
+      const x = await gapi(`https://www.googleapis.com/drive/v3/files/${f.id}?alt=media`); if (!x.ok) continue;
+      const j = await x.json().catch(() => ({}));
+      for (const [k, v] of Object.entries(j.books || {})) {
+        const cur = books[k] || {}, byId = (a, b) => Object.values(Object.fromEntries([...(a || []), ...(b || [])].filter(m => m?.id).map(m => [m.id, m])));
+        books[k] = { ...cur, ...v, marks: byId(cur.marks, v.marks), bmarks: byId(cur.bmarks, v.bmarks) };
+      }
+    }
+    await store.put('state', 'legacy:seojae', { books, at: Date.now() });
+    ls.set('yb-legacy-at', Date.now());
+    const count = Object.values(books).reduce((a, b) => a + (b.marks || []).filter(m => m && !m.del).length, 0);
+    if (count) toast(`예전 ‘서재’ 앱의 하이라이트 ${count}개를 찾았어요. 책을 열면 그 책의 하이라이트가 옮겨져요.`);
+  } catch (e) { console.warn('legacy', e); }
+}
+// where a quoted passage sits in the book (whitespace-insensitive), as block/offset positions
+function findTextPos(text) {
+  const norm = t => t.replace(/\s+/g, ' ').trim();
+  const full = norm(text || ''); if (full.length < 2) return null;
+  const needle = full.slice(0, 200);
+  R.hay ||= [];
+  for (let c = 0; c < (R.texts || []).length; c++) {
+    if (!R.hay[c]) {
+      const chars = [], map = [];
+      (R.texts[c] || []).forEach((t, b) => {
+        for (let o = 0; o < t.length; o++) {
+          if (/\s/.test(t[o])) { if (chars.length && chars[chars.length - 1] !== ' ') { chars.push(' '); map.push([b, o]); } }
+          else { chars.push(t[o]); map.push([b, o]); }
+        }
+        if (chars.length && chars[chars.length - 1] !== ' ') { chars.push(' '); map.push([b, t.length]); }
+      });
+      R.hay[c] = { s: chars.join(''), map };
+    }
+    const { s, map } = R.hay[c], k = s.indexOf(needle);
+    if (k < 0) continue;
+    const len = s.startsWith(full, k) ? full.length : needle.length, a = map[k], z = map[k + len - 1];
+    return { ch: c, s: { b: a[0], o: a[1] }, e: { b: z[0], o: z[1] + 1 } };
+  }
+  return null;
+}
+async function applyLegacy() {
+  if (!R.book || !isDrive(R.id) || R.st.legacyDone) return;
+  const L = await store.get('state', 'legacy:seojae');
+  const old = L?.books?.[R.id.slice(2)];
+  if (!old) return;
+  if (!R.book.isPdf && !R.texts) { R.legacyPending = true; return; } // wait for the book's text index
+  R.legacyPending = false;
+  const have = new Set([...R.st.highlights.map(h => h.id), ...(R.st.tomb || []).map(t => t.id)]);
+  let ok = 0, miss = 0;
+  for (const m of (old.marks || []).filter(m => m && !m.del)) {
+    const id = 'L' + m.id; if (have.has(id)) continue;
+    const kind = m.style === 'underline' ? 'ul' : 'hl', color = kind === 'ul' ? 'red' : OLD_COLORS[(m.color || '').toUpperCase()] || 'yellow';
+    const base = { id, kind, color, text: m.text || '', note: m.note || '', at: m.at || Date.now() };
+    let h = null;
+    if (R.book.isPdf && m.rects?.length) {
+      const p = (m.page || 1) - 1;
+      h = { ...base, pdf: true, ch: p, rects: m.rects.map(r => ({ p, x: r[0], y: r[1], w: r[2], h: r[3] })) };
+    } else if (!R.book.isPdf) { const pos = findTextPos(m.text); if (pos) h = { ...base, ch: pos.ch, s: pos.s, e: pos.e }; }
+    if (h) { R.st.highlights.push(h); ok++; } else miss++;
+  }
+  for (const b of (old.bmarks || []).filter(b => b && !b.del)) {
+    const id = 'L' + b.id; if (R.st.bookmarks.some(x => x.id === id)) continue;
+    if (R.book.isPdf && b.page) R.st.bookmarks.push({ id, ch: b.page - 1, b: 0, text: `${b.page}쪽`, at: b.at || Date.now() });
+    else if (!R.book.isPdf && b.label) { const pos = findTextPos(b.label); if (pos) R.st.bookmarks.push({ id, ch: pos.ch, b: pos.s.b, text: b.label.slice(0, 90), at: b.at || Date.now() }); }
+  }
+  let jump = null; // where the old app had got to, if this book hasn't been read here yet
+  if (!R.st.locAt) {
+    if (R.book.isPdf && old.page > 1) jump = { ch: old.page - 1, t: {} };
+    else if (!R.book.isPdf && old.pct > 0) { const t = seekTarget(Math.min(1, old.pct / 100)); jump = { ch: t.ch, t: { fraction: t.fraction } }; }
+  }
+  R.st.legacyDone = true; saveNow();
+  await renderChapter(jump ? jump.ch : R.ch, jump ? jump.t : { block: R.anchor ?? currentAnchor() }, false);
+  if (ok || miss) toast(`예전 ‘서재’ 앱의 하이라이트 ${ok}개를 옮겼어요${miss ? ` (본문에서 찾지 못한 ${miss}개 제외)` : ''}`);
+}
+
 /* ================= collections (Apple Books style shelves the reader makes) ================= */
 const COLS = Object.assign({ at: 0, list: [] }, ls.get('yb-cols', {}));
 function saveCols() { COLS.at = Date.now(); ls.set('yb-cols', COLS); queueSync(); }
@@ -2235,7 +2520,7 @@ async function connectDrive() {
     await getToken(true);
     G.on = true; G.err = null; ls.set('yb-g-on', true);
     toast('Google Drive에 연결했어요');
-    await scanDrive(); await syncNow(); renderLibrary();
+    await scanDrive(); await syncNow(); renderLibrary(); fetchLegacy();
   } catch (e) {
     console.warn(e);
     toast(/popup|closed/i.test(e.message) ? '로그인 창이 닫혔어요. 다시 눌러 주세요.' : 'Google Drive에 연결하지 못했어요: ' + e.message);
@@ -2298,7 +2583,7 @@ function mergeBook(a, b) {
   return {
     loc: pos.loc, locAt: pos.locAt || 0, progress: pos.progress || 0, total: a.total || b.total || 0,
     lastOpened: Math.max(a.lastOpened || 0, b.lastOpened || 0),
-    title: meta.title, author: meta.author, cat: meta.cat, metaAt: meta.metaAt || 0,
+    title: meta.title, author: meta.author, cat: meta.cat, metaAt: meta.metaAt || 0, legacyDone: a.legacyDone || b.legacyDone || undefined,
     highlights: mergeItems(a.highlights, b.highlights, tomb), bookmarks: mergeItems(a.bookmarks, b.bookmarks, tomb),
     tomb: [...tomb].map(([id, mt]) => ({ id, mt })).sort((p, q) => (p.id < q.id ? -1 : 1)),
   };
@@ -2378,10 +2663,10 @@ $('#driveBtn').onclick = () => {
 };
 function openDriveDialog() {
   const dlg = $('#libDlg');
-  const n = G.list.filter(f => /\.(epub|txt)$/i.test(f.name)).length;
+  const n = G.list.filter(f => /\.(epub|txt|pdf)$/i.test(f.name)).length;
   dlg.innerHTML = `<form method="dialog">
     <h2>Google Drive</h2>
-    <p class="sub">책 폴더에서 EPUB·TXT ${n}권을 찾았어요.${G.lastSync ? ' 마지막으로 맞춘 때: ' + new Date(G.lastSync).toLocaleString('ko-KR') : ''}${G.err ? '<br>최근 오류: ' + esc(G.err.message) : ''}</p>
+    <p class="sub">책 폴더에서 EPUB·PDF·TXT ${n}권을 찾았어요.${G.lastSync ? ' 마지막으로 맞춘 때: ' + new Date(G.lastSync).toLocaleString('ko-KR') : ''}${G.err ? '<br>최근 오류: ' + esc(G.err.message) : ''}</p>
     <label>책 폴더 ID<input id="gFid" value="${esc(G.fid)}" spellcheck="false" autocomplete="off">
       <small>Drive에서 책 폴더를 열었을 때 주소의 <b>folders/</b> 뒤에 오는 글자예요. 하위 폴더까지 모두 찾아요.</small></label>
     <details><summary>고급 설정</summary><label>OAuth 클라이언트 ID<input id="gCid" value="${esc(G.cid)}" spellcheck="false" autocomplete="off"></label>
@@ -2471,7 +2756,7 @@ matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => setT
 renderLibrary();
 syncThemeColor();
 loadGIS().catch(() => {}); // ready before the first tap, so the sign-in popup isn't blocked
-if (G.on) syncNow().then(() => { renderLibrary(); if (Date.now() - G.listAt > 5 * 60000) scanDrive(); });
+if (G.on) syncNow().then(() => { renderLibrary(); if (Date.now() - G.listAt > 5 * 60000) scanDrive(); fetchLegacy(); });
 </script>
 </body>
 </html>
