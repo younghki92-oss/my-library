@@ -51,9 +51,46 @@ svg.i{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.7;stro
 .btn svg.i{width:18px;height:18px}
 
 /* ---------- library ---------- */
-#library{max-width:1080px;margin:0 auto;padding-inline:clamp(16px,4vw,40px);padding-block:20px 48px}
-.lib-head{display:flex;align-items:center;gap:12px;padding-block:8px 24px}
-.brand{display:flex;align-items:center;gap:10px;font-family:var(--f-display);font-size:24px;font-weight:700;letter-spacing:-.01em;margin-right:auto}
+#library{display:grid;grid-template-columns:248px minmax(0,1fr);min-height:100%}
+#side{position:sticky;top:0;height:100vh;box-sizing:border-box;display:flex;flex-direction:column;gap:4px;padding:calc(env(safe-area-inset-top,0px) + 22px) 14px calc(env(safe-area-inset-bottom,0px) + 14px);background:var(--surface);border-right:1px solid var(--line);overflow-y:auto;z-index:15}
+#side .brand{padding:0 8px 14px}
+.search{display:flex;align-items:center;gap:8px;border:1px solid var(--line);background:var(--bg);border-radius:10px;padding:0 10px;margin:0 2px 10px}
+.search svg{width:17px;height:17px;flex:none;color:var(--muted);fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round}
+.search input{flex:1;min-width:0;border:0;background:none;color:var(--ink);font:inherit;font-size:14px;padding:9px 0;outline:none}
+.side-h{margin:16px 10px 4px;font-size:12px;font-weight:600;color:var(--muted);letter-spacing:.04em}
+.side-item{display:flex;align-items:center;gap:10px;width:100%;border:0;background:none;color:var(--ink);font:inherit;font-size:14.5px;padding:8px 10px;border-radius:9px;cursor:pointer;text-align:left}
+.side-item svg{width:19px;height:19px;flex:none;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;color:var(--muted)}
+.side-item .lbl{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.side-item .n{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.side-item:hover{background:color-mix(in srgb,var(--ink) 6%,transparent)}
+.side-item[aria-current="true"]{background:color-mix(in srgb,var(--ink) 10%,transparent);font-weight:600}
+.side-item.drop-on{background:var(--accent-soft);box-shadow:inset 0 0 0 2px var(--accent)}
+.side-item.add{color:var(--muted)}
+.side-foot{margin-top:auto;padding-top:14px;display:flex;flex-direction:column;gap:8px;align-items:flex-start}
+#libMain{min-width:0;padding-inline:clamp(16px,4vw,48px);padding-block:calc(env(safe-area-inset-top,0px) + 26px) 56px}
+.main-head{display:flex;align-items:center;gap:12px;margin-bottom:22px;flex-wrap:wrap}
+.main-head h1{margin:0;font-family:var(--f-display);font-size:clamp(26px,4vw,38px);font-weight:700;letter-spacing:-.01em}
+.main-head #count{color:var(--muted);font-size:14px;font-variant-numeric:tabular-nums}
+.main-head .acts{margin-left:auto;display:flex;gap:6px}
+.main-head .acts .btn{padding:6px 12px;font-size:13px}
+#sideToggle{display:none;width:40px;height:40px;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:10px;cursor:pointer}
+#sideToggle svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round}
+#sideScrim{display:none}
+@media (max-width:759px){
+  #library{grid-template-columns:minmax(0,1fr)}
+  #side{position:fixed;left:0;top:0;bottom:0;width:min(280px,84vw);height:auto;transform:translateX(-102%);transition:transform .25s ease;box-shadow:var(--shadow)}
+  #library.side-open #side{transform:none}
+  #library.side-open #sideScrim{display:block;position:fixed;inset:0;background:var(--scrim);z-index:14}
+  #sideToggle{display:inline-flex;align-items:center;justify-content:center}
+}
+.drag-ghost{position:fixed;z-index:80;width:64px;pointer-events:none;transform:translate(-50%,-60%) rotate(-4deg);opacity:.92;filter:drop-shadow(0 10px 18px rgba(0,0,0,.35))}
+.card.dragging{opacity:.4}
+.cover-btn{touch-action:pan-y;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
+.col-checks{border:0;padding:0;margin:0 0 14px;display:flex;flex-direction:column;gap:2px}
+.col-checks legend{font-size:13px;color:var(--muted);font-weight:500;margin-bottom:6px;padding:0}
+.col-checks label{flex-direction:row;align-items:center;gap:10px;margin:0;padding:6px 2px;font-size:14.5px;color:var(--ink);font-weight:400}
+.col-checks input{width:18px;height:18px;accent-color:var(--accent)}
+.brand{display:flex;align-items:center;gap:10px;font-family:var(--f-display);font-size:24px;font-weight:700;letter-spacing:-.01em}
 .brand .mark{width:22px;height:28px;border:1.5px solid currentColor;border-radius:2px;position:relative}
 .brand .mark::after{content:"";position:absolute;inset:5px 5px 9px 5px;border-top:1.5px solid currentColor;border-bottom:1.5px solid currentColor;opacity:.55}
 .continue{display:flex;gap:20px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:18px;margin-bottom:36px}
@@ -68,7 +105,7 @@ svg.i{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.7;stro
 .shelf-head{display:flex;align-items:baseline;gap:10px;margin-bottom:16px}
 .shelf-head h2{margin:0;font-size:15px;font-weight:600}
 .shelf-head span{color:var(--muted);font-size:13px}
-#grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(132px,1fr));gap:30px 22px}
+#grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:34px 26px}
 @media (max-width:520px){ #grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:22px 14px} .continue{gap:14px;padding:14px} .continue .cover{width:70px} }
 .card{position:relative;min-width:0;display:flex;flex-direction:column;gap:8px}
 .cover-btn{display:block;border:0;padding:0;background:none;cursor:pointer;border-radius:3px 6px 6px 3px}
@@ -87,11 +124,6 @@ svg.i{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.7;stro
 .confirm div{display:flex;gap:6px;flex-wrap:wrap;justify-content:center}
 .confirm .btn{padding:6px 12px;font-size:13px}
 .hint{color:var(--muted);font-size:13px;margin-top:40px;line-height:1.6}
-.filters{display:flex;flex-wrap:wrap;gap:6px;margin:-4px 0 18px}
-.filters button{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:999px;padding:6px 12px;font-size:13px;cursor:pointer;font-variant-numeric:tabular-nums}
-.filters button[aria-pressed="true"]{border-color:var(--ink);box-shadow:inset 0 0 0 1px var(--ink);font-weight:600}
-.filters button.add{color:var(--muted);border-style:dashed}
-.cdot{width:8px;height:8px;border-radius:50%;display:inline-block;flex:none}
 .card-foot .foot-txt{display:inline-flex;align-items:center;gap:6px;min-width:0}
 .lib-dlg select{border:1px solid var(--line);border-radius:10px;padding:10px 12px;font:inherit;font-size:14.5px;background:var(--bg);color:var(--ink)}
 .cat-row{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--line);font-size:14.5px}
@@ -290,18 +322,34 @@ mark.pend{background:var(--hl-yellow);color:inherit;outline:1.5px dashed var(--a
 <body>
 
 <section id="library" aria-label="서재">
-  <header class="lib-head">
+  <aside id="side" aria-label="서재 메뉴">
     <div class="brand"><span class="mark" aria-hidden="true"></span>여백</div>
-    <button class="drive-chip" id="driveBtn"><span class="dot"></span><span id="driveTxt">Google Drive 연결</span></button>
-    <button class="btn" id="installBtn" hidden>앱으로 설치</button>
-    <button class="btn primary" id="addBtn"><svg class="i" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>책 추가</button>
-    <input type="file" id="fileIn" multiple accept=".epub,.txt,application/epub+zip,text/plain" hidden>
-  </header>
-  <div id="continue"></div>
-  <div class="shelf-head"><h2>서재</h2><span id="count"></span></div>
-  <div class="filters" id="filters"></div>
-  <div id="grid"></div>
-  <p class="hint" id="libHint"></p>
+    <label class="search"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg><input id="libQ" type="search" placeholder="제목, 저자 검색" autocomplete="off"></label>
+    <p class="side-h">서재</p>
+    <button class="side-item" data-view="all"><svg viewBox="0 0 24 24"><path d="M4 4.5h3v15H4zM9 4.5h3v15H9zM14.2 5.2l2.9-.8 3.9 14.5-2.9.8z"/></svg><span class="lbl">전체</span><span class="n" id="nAll"></span></button>
+    <button class="side-item" data-view="reading"><svg viewBox="0 0 24 24"><path d="M3 5.5c3-1 6-1 9 1 3-2 6-2 9-1v13c-3-1-6-1-9 1-3-2-6-2-9-1z"/><path d="M12 6.5v13"/></svg><span class="lbl">읽는 중</span><span class="n" id="nReading"></span></button>
+    <button class="side-item" data-view="done"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M8 12.3l2.7 2.7L16 9.6"/></svg><span class="lbl">다 읽음</span><span class="n" id="nDone"></span></button>
+    <p class="side-h">나의 컬렉션</p>
+    <div id="colList"></div>
+    <button class="side-item add" id="newCol" data-newcol><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg><span class="lbl">새 컬렉션</span></button>
+    <div class="side-foot">
+      <button class="drive-chip" id="driveBtn"><span class="dot"></span><span id="driveTxt">Google Drive 연결</span></button>
+      <button class="btn" id="addBtn" hidden><svg class="i" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>파일 추가</button>
+      <button class="btn" id="installBtn" hidden>앱으로 설치</button>
+      <input type="file" id="fileIn" multiple accept=".epub,.txt,application/epub+zip,text/plain" hidden>
+    </div>
+  </aside>
+  <div id="sideScrim"></div>
+  <main id="libMain">
+    <header class="main-head">
+      <button id="sideToggle" aria-label="서재 메뉴"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+      <h1 id="viewTitle">전체</h1><span id="count"></span>
+      <div class="acts" id="viewActs"></div>
+    </header>
+    <div id="continue"></div>
+    <div id="grid"></div>
+    <p class="hint" id="libHint"></p>
+  </main>
 </section>
 <div id="drop" hidden>여기에 놓으면 서재에 추가돼요</div>
 <dialog class="lib-dlg" id="libDlg"></dialog>
@@ -679,15 +727,27 @@ async function libraryBooks() {
 async function renderLibrary() {
   const raw = await libraryBooks();
   const states = new Map(await Promise.all(raw.map(async b => [b.id, await store.get('state', b.id)])));
-  const all = raw.map(b => { const st = states.get(b.id); return { ...displayMeta(b, st), cat: catOf(b, st) }; });
-  renderFilters(all);
-  const books = LIB.filter === 'all' ? all : all.filter(b => b.cat.id === LIB.filter);
+  const all = raw.map(b => displayMeta(b, states.get(b.id)));
+  const prog = id => states.get(id)?.progress || 0;
+  const inView = {
+    all: () => true,
+    reading: b => prog(b.id) > 0 && prog(b.id) < 0.98,
+    done: b => prog(b.id) >= 0.98,
+  };
+  const col = LIB.view.startsWith('col:') ? COLS.list.find(c => 'col:' + c.id === LIB.view) : null;
+  if (LIB.view.startsWith('col:') && !col) LIB.view = 'all';
+  renderSide(all, inView);
+  const q = LIB.q.trim().toLowerCase();
+  let books = all.filter(col ? b => col.books.includes(b.id) : inView[LIB.view]);
+  if (q) books = books.filter(b => (b.title + ' ' + (b.author || '') + ' ' + (b.file?.name || '')).toLowerCase().includes(q));
+  $('#viewTitle').textContent = col ? col.name : { all: '전체', reading: '읽는 중', done: '다 읽음' }[LIB.view];
+  $('#viewActs').innerHTML = col ? '<button class="btn" data-colact="rename">이름 바꾸기</button><button class="btn" data-colact="delete">삭제</button>' : '';
   books.sort((a, b) => (states.get(b.id)?.lastOpened || 0) - (states.get(a.id)?.lastOpened || 0) || (b.addedAt || 0) - (a.addedAt || 0));
   const pctOf = id => Math.round((states.get(id)?.progress || 0) * 100);
 
   const last = books[0];
   const cont = $('#continue');
-  if (last) {
+  if (last && LIB.view === 'all' && !q) {
     const st = states.get(last.id), opened = !!st?.lastOpened, pct = pctOf(last.id);
     const left = st?.total ? `다 읽기까지 약 ${fmtMin(st.total * (1 - (st.progress || 0)))}` : '';
     cont.innerHTML = `<div class="continue">${coverHTML(last)}<div class="txt">
@@ -697,7 +757,7 @@ async function renderLibrary() {
       <button class="btn primary" data-open="${esc(last.id)}">${opened ? '이어 읽기' : '읽기 시작'}</button></div></div>`;
   } else cont.innerHTML = '';
 
-  $('#count').textContent = LIB.filter === 'all' ? `${books.length}권` : `${books.length} / ${all.length}권`;
+  $('#count').textContent = `${books.length}권`;
   const footOf = b => b.sample ? '<span class="badge">예시</span>'
     : pctOf(b.id) ? pctOf(b.id) + '%'
     : b.source === 'drive' && !b.cached ? '<span class="cloud">☁ Drive</span>' : '새 책';
@@ -705,19 +765,20 @@ async function renderLibrary() {
     <button class="cover-btn" data-open="${esc(b.id)}" aria-label="${esc(b.title)} 열기">${coverHTML(b)}</button>
     <h3>${esc(b.title)}</h3>
     <div class="bar"><i style="width:${pctOf(b.id)}%"></i></div>
-    <div class="card-foot"><span class="foot-txt">${b.sample ? '' : `<i class="cdot" style="background:${b.cat.color}" title="${esc(b.cat.name)}"></i>`}${footOf(b)}</span>
+    <div class="card-foot"><span class="foot-txt">${footOf(b)}</span>
       <button class="more" data-edit="${esc(b.id)}" aria-label="${esc(b.title)} 정보 고치기">⋯</button></div>
-  </article>`).join('') || '<p class="empty">서재가 비어 있어요. ‘책 추가’로 첫 책을 넣어 보세요.</p>';
+  </article>`).join('') || `<p class="empty">${q ? `‘${esc(LIB.q)}’와(과) 맞는 책이 없어요.` : col ? '아직 비어 있어요. 서재의 표지를 왼쪽의 이 컬렉션으로 끌어다 놓거나, 책의 ⋯에서 넣을 수 있어요.' : '이 목록에 책이 없어요.'}</p>`;
+  $('#addBtn').hidden = G.on;
   $('#libHint').innerHTML = G.on
-    ? 'Google Drive 책 폴더의 EPUB·TXT가 이 서재에 보여요. 읽은 위치와 하이라이트는 Drive를 통해 다른 기기와 맞춰져요.<br>이 기기에서 직접 추가한 책은 이 기기에만 있어요.'
+    ? 'Google Drive 책 폴더의 EPUB·TXT가 이 서재에 보여요. 표지를 왼쪽 컬렉션으로 끌어다 놓아 정리할 수 있어요.<br>읽은 위치, 하이라이트, 컬렉션은 Drive를 통해 다른 기기와 맞춰져요.'
     : 'EPUB·TXT 파일을 이 창에 끌어다 놓거나 ‘책 추가’를 누르세요. 가져온 책은 이 기기에만 저장돼요.<br>‘Google Drive 연결’을 누르면 Drive 책 폴더를 서재로 쓰고, 다른 기기와 읽은 위치·하이라이트를 맞출 수 있어요.';
   updateDriveChip();
   LIB.books = books;
 }
-const LIB = { books: [], filter: ls.get('yb-filter', 'all') };
+const LIB = { books: [], view: ls.get('yb-view', 'all'), q: '' };
 library.addEventListener('click', async e => {
   const t = e.target.closest('button'); if (!t) return;
-  if (t.dataset.open) openBook(t.dataset.open);
+  if (t.dataset.open) { if (!DRAG.justDragged) openBook(t.dataset.open); }
   else if (t.dataset.edit) openBookDialog(LIB.books.find(b => b.id === t.dataset.edit));
 });
 function openBookDialog(b) {
@@ -728,7 +789,7 @@ function openBookDialog(b) {
     <h2>책 정보</h2>
     <p class="sub">${drive ? 'Drive 파일: ' + esc(b.file.name) : b.sample ? '앱에 들어 있는 예시 책이에요.' : '이 기기에 추가한 책이에요.'}</p>
     ${b.sample ? '' : `<label>제목<input id="bTitle" value="${esc(b.title)}"></label><label>저자<input id="bAuthor" value="${esc(b.author || '')}"></label>
-      <label>분류<select id="bCat">${CATS.list.map(c => `<option value="${esc(c.id)}" ${c.id === b.cat?.id ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</select></label>`}
+      ${COLS.list.length ? `<fieldset class="col-checks"><legend>컬렉션</legend>${COLS.list.map(c => `<label><input type="checkbox" name="col" value="${esc(c.id)}" ${c.books.includes(b.id) ? 'checked' : ''}>${esc(c.name)}</label>`).join('')}</fieldset>` : ''}`}
     <div class="dlg-acts">
       ${drive ? (b.cached ? '<button class="btn left" value="uncache">받아 둔 파일 지우기</button>' : '') : '<button class="btn danger left" value="delete">서재에서 지우기</button>'}
       <button class="btn" value="cancel">닫기</button>${b.sample ? '' : '<button class="btn primary" value="save">저장</button>'}
@@ -736,13 +797,18 @@ function openBookDialog(b) {
   dlg.onclose = async () => {
     const v = dlg.returnValue;
     if (v === 'save') {
-      const title = $('#bTitle').value.trim() || b.title, author = $('#bAuthor').value.trim(), cat = $('#bCat').value;
+      const title = $('#bTitle').value.trim() || b.title, author = $('#bAuthor').value.trim();
+      const picked = new Set($$('input[name=col]:checked', dlg).map(x => x.value));
+      if (COLS.list.some(c => c.books.includes(b.id) !== picked.has(c.id))) {
+        COLS.list = COLS.list.map(c => ({ ...c, books: picked.has(c.id) ? [...new Set([...c.books, b.id])] : c.books.filter(x => x !== b.id) }));
+        saveCols();
+      }
       if (drive) { // edits on Drive books travel with the sync file
         const st = (await store.get('state', b.id)) || { loc: { ch: 0, block: 0 }, highlights: [], bookmarks: [] };
-        Object.assign(st, { title, author, cat, metaAt: Date.now() });
+        if (st.title !== title || st.author !== author || b.title !== title || (b.author || '') !== author) Object.assign(st, { title, author, metaAt: Date.now() });
         await store.put('state', b.id, st); queueSync();
       } else {
-        const m = await store.get('books', b.id); if (m) await store.put('books', b.id, { ...m, title, author, cat });
+        const m = await store.get('books', b.id); if (m) await store.put('books', b.id, { ...m, title, author });
       }
       toast('책 정보를 고쳤어요');
     } else if (v === 'delete') {
@@ -1891,85 +1957,122 @@ function renderDict(arg) {
   })();
 }
 
-/* ================= categories ================= */
-// The reader's own shelves, with words that sort books automatically by file name or title.
-const CAT_PALETTE = ['#6E8FB8', '#8A7BB8', '#C8A45C', '#6FA58C', '#B87B8A', '#7E8A97', '#C97B54', '#5FA3B5', '#A8B86E', '#B8628A'];
-const DEFAULT_CATS = [
-  { id: 'comm', name: '성경주석', color: '#6E8FB8', kw: ['주석', '강해', 'commentary', 'exegetical', 'wbc', 'nicnt', 'nicot', 'nigtc', 'becnt', 'icc', 'pillar', 'word biblical', 'anchor bible', 'tyndale', '틴델'] },
-  { id: 'theo', name: '신학', color: '#8A7BB8', kw: ['신학', 'theology', 'theological', 'doctrine', 'dogmatic', '조직신학', '교의', 'systematic', '기독론', '구원론', '교회론', '변증'] },
-  { id: 'serm', name: '설교', color: '#C8A45C', kw: ['설교', 'sermon', 'preaching', '강단', 'homilet'] },
-  { id: 'past', name: '목회·사역', color: '#6FA58C', kw: ['목회', '사역', 'ministry', 'pastoral', '리더십', 'leadership', '제자훈련', '상담'] },
-  { id: 'devo', name: '영성·경건', color: '#B87B8A', kw: ['영성', '경건', '묵상', '기도', 'devotional', 'spiritual', 'prayer', '큐티'] },
-  { id: 'gen', name: '일반', color: '#7E8A97', kw: [] },
-];
-const CATS = Object.assign({ at: 0, list: DEFAULT_CATS }, ls.get('yb-cats', {}));
-function saveCats() { CATS.at = Date.now(); ls.set('yb-cats', CATS); queueSync(); }
-function catOf(b, st) {
-  const pick = id => CATS.list.find(c => c.id === id);
-  const own = pick(st?.cat || b.cat); if (own) return own;
-  const hay = ((b.file?.name || '') + ' ' + (b.title || '')).toLowerCase();
-  // longest keyword wins; on a tie, the one that appears first ("설교의" → 설교, not 교의)
-  let best = null, len = 0, at = Infinity;
-  for (const c of CATS.list) for (const k of c.kw || []) {
-    const kk = String(k).toLowerCase(), i = kk ? hay.indexOf(kk) : -1;
-    if (i >= 0 && (kk.length > len || (kk.length === len && i < at))) { best = c; len = kk.length; at = i; }
-  }
-  return best || CATS.list[CATS.list.length - 1] || { id: 'gen', name: '일반', color: '#7E8A97' };
+/* ================= collections (Apple Books style shelves the reader makes) ================= */
+const COLS = Object.assign({ at: 0, list: [] }, ls.get('yb-cols', {}));
+function saveCols() { COLS.at = Date.now(); ls.set('yb-cols', COLS); queueSync(); }
+const COL_ICON = '<svg viewBox="0 0 24 24"><path d="M5 7h14M5 12h14M5 17h9"/></svg>';
+function renderSide(all, inView) {
+  const real = all.filter(b => !b.sample);
+  $('#nAll').textContent = all.length;
+  $('#nReading').textContent = all.filter(inView.reading).length || '';
+  $('#nDone').textContent = all.filter(inView.done).length || '';
+  const ids = new Set(all.map(b => b.id));
+  $('#colList').innerHTML = COLS.list.map(c => `<button class="side-item" data-view="col:${esc(c.id)}" data-col="${esc(c.id)}">${COL_ICON}<span class="lbl">${esc(c.name)}</span><span class="n">${c.books.filter(x => ids.has(x)).length || ''}</span></button>`).join('');
+  $$('#side [data-view]').forEach(x => x.setAttribute('aria-current', x.dataset.view === LIB.view));
+  void real;
 }
-function renderFilters(all) {
-  const el = $('#filters'); if (!el) return;
-  const books = all.filter(b => !b.sample), counts = {};
-  books.forEach(b => { counts[b.cat.id] = (counts[b.cat.id] || 0) + 1; });
-  if (LIB.filter !== 'all' && !counts[LIB.filter]) LIB.filter = 'all';
-  if (!books.length) { el.innerHTML = ''; return; }
-  el.innerHTML = `<button data-filter="all" aria-pressed="${LIB.filter === 'all'}">전체 ${books.length}</button>`
-    + CATS.list.filter(c => counts[c.id]).map(c => `<button data-filter="${esc(c.id)}" aria-pressed="${LIB.filter === c.id}"><i class="cdot" style="background:${c.color}"></i>${esc(c.name)} ${counts[c.id]}</button>`).join('')
-    + '<button class="add" data-cats>분류 관리</button>';
-}
-$('#filters').addEventListener('click', e => {
+$('#side').addEventListener('click', e => {
   const b = e.target.closest('button'); if (!b) return;
-  if (b.dataset.filter) { LIB.filter = b.dataset.filter; ls.set('yb-filter', LIB.filter); renderLibrary(); }
-  else if ('cats' in b.dataset) openCatsDialog();
+  if (b.dataset.view) { LIB.view = b.dataset.view; ls.set('yb-view', LIB.view); library.classList.remove('side-open'); renderLibrary(); }
+  else if ('newcol' in b.dataset) colDialog(null);
 });
-function openCatsDialog() {
+$('#side').addEventListener('contextmenu', e => {
+  const b = e.target.closest('[data-col]'); if (!b) return;
+  e.preventDefault(); colDialog(COLS.list.find(c => c.id === b.dataset.col));
+});
+$('#viewActs').addEventListener('click', e => {
+  const b = e.target.closest('[data-colact]'); if (!b) return;
+  const c = COLS.list.find(x => 'col:' + x.id === LIB.view); if (!c) return;
+  if (b.dataset.colact === 'rename') colDialog(c); else colDialog(c, true);
+});
+let qT;
+$('#libQ').addEventListener('input', e => { LIB.q = e.target.value; clearTimeout(qT); qT = setTimeout(renderLibrary, 120); });
+$('#sideToggle').onclick = () => library.classList.toggle('side-open');
+$('#sideScrim').onclick = () => library.classList.remove('side-open');
+// new / rename / delete a collection; `then` receives the new collection (used when a book is dropped on "새 컬렉션")
+function colDialog(c, del = false, then) {
   const dlg = $('#libDlg');
-  dlg.innerHTML = `<form method="dialog"><h2>분류 관리</h2>
-    <p class="sub">파일 이름이나 제목에 자동 분류 단어가 들어 있으면 그 분류로 정리돼요. 책마다 ‘⋯ → 책 정보’에서 직접 바꿀 수도 있어요.</p>
-    ${CATS.list.map(c => `<div class="cat-row"><i class="cdot" style="background:${c.color}"></i><span class="n">${esc(c.name)} <small>${(c.kw || []).length ? '자동 단어 ' + c.kw.length + '개' : ''}</small></span><button class="btn" value="edit:${esc(c.id)}">고치기</button></div>`).join('')}
-    <div class="dlg-acts" style="margin-top:16px"><button class="btn left" value="add">분류 추가</button><button class="btn primary" value="close">닫기</button></div></form>`;
-  dlg.onclose = () => {
-    const v = dlg.returnValue || '';
-    if (v === 'add') openCatEdit(null);
-    else if (v.startsWith('edit:')) openCatEdit(CATS.list.find(c => c.id === v.slice(5)));
-    else renderLibrary();
-  };
-  dlg.showModal();
-}
-function openCatEdit(c) {
-  const dlg = $('#libDlg'), isNew = !c;
-  let color = c?.color || CAT_PALETTE[CATS.list.length % CAT_PALETTE.length];
-  dlg.innerHTML = `<form method="dialog"><h2>${isNew ? '분류 추가' : '분류 고치기'}</h2>
-    <label>이름<input id="cName" value="${esc(c?.name || '')}" placeholder="예: 조직신학"></label>
-    <label>색</label><div class="swatches">${CAT_PALETTE.map(p => `<button type="button" data-color="${p}" style="background:${p}" aria-label="${p}" aria-pressed="${p === color}"></button>`).join('')}</div>
-    <label>자동 분류 단어 (쉼표로 구분, 비워도 돼요)<input id="cKw" value="${esc((c?.kw || []).join(', '))}" placeholder="예: 조직신학, systematic, dogmatic"></label>
-    <div class="dlg-acts">${!isNew && CATS.list.length > 1 ? '<button class="btn danger left" value="del">삭제</button>' : ''}<button class="btn" value="cancel">취소</button><button class="btn primary" value="save">저장</button></div></form>`;
-  dlg.querySelector('.swatches').onclick = e => {
-    const b = e.target.closest('[data-color]'); if (!b) return;
-    color = b.dataset.color; dlg.querySelectorAll('.swatches button').forEach(x => x.setAttribute('aria-pressed', x === b));
-  };
+  dlg.innerHTML = del
+    ? `<form method="dialog"><h2>‘${esc(c.name)}’ 컬렉션을 지울까요?</h2><p class="sub">컬렉션만 지워지고, 안에 있던 책은 서재에 그대로 남아요.</p>
+       <div class="dlg-acts"><button class="btn" value="cancel">취소</button><button class="btn danger" value="del">지우기</button></div></form>`
+    : `<form method="dialog"><h2>${c ? '컬렉션 이름 바꾸기' : '새 컬렉션'}</h2>
+       <label>이름<input id="colName" value="${esc(c?.name || '')}" placeholder="예: 주석, 신학책, 영어 원서" autocomplete="off"></label>
+       <div class="dlg-acts">${c ? '<button class="btn danger left" value="askdel">삭제</button>' : ''}<button class="btn" value="cancel">취소</button><button class="btn primary" value="save">${c ? '저장' : '만들기'}</button></div></form>`;
   dlg.onclose = () => {
     const v = dlg.returnValue;
     if (v === 'save') {
-      const name = $('#cName').value.trim() || '이름 없는 분류', kw = $('#cKw').value.split(/[,，]/).map(x => x.trim()).filter(Boolean);
-      CATS.list = CATS.list.map(x => ({ ...x }));
-      if (isNew) CATS.list.splice(Math.max(0, CATS.list.length - 1), 0, { id: uid('c'), name, color, kw });
-      else Object.assign(CATS.list.find(x => x.id === c.id), { name, color, kw });
-      saveCats();
-    } else if (v === 'del') { CATS.list = CATS.list.filter(x => x.id !== c.id); saveCats(); }
-    openCatsDialog();
+      const name = $('#colName').value.trim(); if (!name) return;
+      if (c) COLS.list = COLS.list.map(x => (x.id === c.id ? { ...x, name } : x));
+      else { const n = { id: uid('c'), name, books: [] }; COLS.list = [...COLS.list, n]; saveCols(); then?.(n); if (!then) { LIB.view = 'col:' + n.id; ls.set('yb-view', LIB.view); } }
+      saveCols();
+    } else if (v === 'askdel') return colDialog(c, true);
+    else if (v === 'del') { COLS.list = COLS.list.filter(x => x.id !== c.id); if (LIB.view === 'col:' + c.id) LIB.view = 'all'; saveCols(); toast('컬렉션을 지웠어요'); }
+    renderLibrary();
   };
   dlg.showModal();
+  setTimeout(() => $('#colName')?.focus(), 30);
 }
+function addToCol(colId, bookId) {
+  const c = COLS.list.find(x => x.id === colId); if (!c) return;
+  if (c.books.includes(bookId)) return toast(`이미 ‘${c.name}’에 있어요`);
+  COLS.list = COLS.list.map(x => (x.id === colId ? { ...x, books: [...x.books, bookId] } : x));
+  saveCols(); renderLibrary();
+  toast(`‘${c.name}’에 넣었어요`, { label: '되돌리기', fn: () => { COLS.list = COLS.list.map(x => (x.id === colId ? { ...x, books: x.books.filter(y => y !== bookId) } : x)); saveCols(); renderLibrary(); } });
+}
+
+/* --- drag a cover onto a collection: mouse drags right away, touch after a long press --- */
+const DRAG = { on: false, timer: 0 };
+$('#grid').addEventListener('contextmenu', e => { if (e.target.closest('.cover-btn')) e.preventDefault(); });
+$('#grid').addEventListener('pointerdown', e => {
+  const btn = e.target.closest('.cover-btn'); if (!btn || e.button > 0) return;
+  const id = btn.dataset.open; if (!id || id === 'sample') return;
+  Object.assign(DRAG, { id, btn, x: e.clientX, y: e.clientY, type: e.pointerType, on: false, moved: false });
+  clearTimeout(DRAG.timer);
+  if (e.pointerType !== 'mouse') DRAG.timer = setTimeout(() => startDrag(e.clientX, e.clientY), 380);
+});
+function startDrag(x, y) {
+  if (!DRAG.btn) return;
+  DRAG.on = true;
+  if (innerWidth < 760) library.classList.add('side-open'); // collections live in the drawer on phones
+  const img = DRAG.btn.querySelector('.cover').cloneNode(true);
+  DRAG.ghost = Object.assign(document.createElement('div'), { className: 'drag-ghost' });
+  DRAG.ghost.appendChild(img); document.body.appendChild(DRAG.ghost);
+  DRAG.btn.closest('.card').classList.add('dragging');
+  navigator.vibrate?.(15);
+  moveDrag(x, y);
+}
+function moveDrag(x, y) {
+  Object.assign(DRAG.ghost.style, { left: x + 'px', top: y + 'px' });
+  const t = document.elementFromPoint(x, y)?.closest('[data-col],[data-newcol]');
+  $$('#side .drop-on').forEach(el => el !== t && el.classList.remove('drop-on'));
+  t?.classList.add('drop-on'); DRAG.target = t;
+}
+addEventListener('pointermove', e => {
+  if (!DRAG.btn) return;
+  const dist = Math.hypot(e.clientX - DRAG.x, e.clientY - DRAG.y);
+  if (!DRAG.on) {
+    if (DRAG.type === 'mouse' && dist > 6) startDrag(e.clientX, e.clientY);
+    else if (dist > 10) { clearTimeout(DRAG.timer); DRAG.btn = null; } // a scroll, not a long press
+    return;
+  }
+  moveDrag(e.clientX, e.clientY);
+});
+addEventListener('touchmove', e => { if (DRAG.on) e.preventDefault(); }, { passive: false }); // keep the page still while dragging
+function endDrag2() {
+  clearTimeout(DRAG.timer);
+  if (DRAG.on) {
+    const t = DRAG.target, id = DRAG.id;
+    DRAG.ghost?.remove(); DRAG.btn.closest('.card')?.classList.remove('dragging');
+    $$('#side .drop-on').forEach(el => el.classList.remove('drop-on'));
+    DRAG.justDragged = true; setTimeout(() => (DRAG.justDragged = false), 50);
+    if (t?.dataset.col) addToCol(t.dataset.col, id);
+    else if (t && 'newcol' in t.dataset) colDialog(null, false, n => addToCol(n.id, id));
+    if (innerWidth < 760 && !t) library.classList.remove('side-open');
+  }
+  Object.assign(DRAG, { on: false, btn: null, target: null, ghost: null });
+}
+addEventListener('pointerup', endDrag2);
+addEventListener('pointercancel', endDrag2);
 
 /* ================= Google Drive: library folder + sync ================= */
 // Books come from a Drive folder (read-only). Reading position, highlights, bookmarks and title edits
@@ -2104,10 +2207,10 @@ function syncNow() {
       const lr = await gapi(`https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=${q}&fields=files(id,modifiedTime)&orderBy=modifiedTime desc`);
       if (!lr.ok) throw new Error('sync list ' + lr.status);
       const files = (await lr.json()).files || [];
-      let remote = { books: {} }, rcats = null;
+      let remote = { books: {} }, rcols = null;
       for (const f of files) {
         const r = await gapi(`https://www.googleapis.com/drive/v3/files/${f.id}?alt=media`);
-        if (r.ok) { try { const j = await r.json(); remote = mergeAll(remote, j); if (j.cats && (!rcats || j.cats.at > rcats.at)) rcats = j.cats; } catch {} }
+        if (r.ok) { try { const j = await r.json(); remote = mergeAll(remote, j); if (j.cols && (!rcols || j.cols.at > rcols.at)) rcols = j.cols; } catch {} }
       }
       const merged = mergeAll({ books: local }, remote);
       for (const [k, v] of Object.entries(merged.books)) {
@@ -2115,10 +2218,9 @@ function syncNow() {
         await store.put('state', k, v);
         if (R.book && R.id === k) applyRemoteState(v);
       }
-      const catsChanged = rcats && rcats.at > CATS.at;
-      if (catsChanged) { Object.assign(CATS, rcats); ls.set('yb-cats', CATS); if (reader.hidden) renderLibrary(); }
-      if (!files.length || canon(merged.books) !== canon(remote.books) || (!rcats ? CATS.at > 0 : CATS.at > rcats.at)) {
-        const blob = new Blob([JSON.stringify({ v: 1, updated: Date.now(), books: merged.books, cats: CATS.at ? CATS : undefined })], { type: 'application/json' });
+      if (rcols && rcols.at > COLS.at) { Object.assign(COLS, rcols); ls.set('yb-cols', COLS); if (reader.hidden) renderLibrary(); }
+      if (!files.length || canon(merged.books) !== canon(remote.books) || (!rcols ? COLS.at > 0 : COLS.at > rcols.at)) {
+        const blob = new Blob([JSON.stringify({ v: 1, updated: Date.now(), books: merged.books, cols: COLS.at ? COLS : undefined })], { type: 'application/json' });
         let w;
         if (files[0]) w = await gapi(`https://www.googleapis.com/upload/drive/v3/files/${files[0].id}?uploadType=media`, { method: 'PATCH', body: blob });
         else {
