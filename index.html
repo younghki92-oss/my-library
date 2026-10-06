@@ -83,6 +83,8 @@ svg.i{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.7;stro
   #library.side-open #sideScrim{display:block;position:fixed;inset:0;background:var(--scrim);z-index:14}
   #sideToggle{display:inline-flex;align-items:center;justify-content:center}
 }
+.cover img{-webkit-user-drag:none;user-select:none}
+.drag-ghost .cover{width:64px}
 .drag-ghost{position:fixed;z-index:80;width:64px;pointer-events:none;transform:translate(-50%,-60%) rotate(-4deg);opacity:.92;filter:drop-shadow(0 10px 18px rgba(0,0,0,.35))}
 .card.dragging{opacity:.4}
 .cover-btn{touch-action:pan-y;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
@@ -284,6 +286,9 @@ input[type=range]{width:100%;accent-color:var(--accent);margin:0}
 .pmark.pend{background:var(--accent-soft);outline:1.5px dashed var(--accent);mix-blend-mode:normal}
 .textLayer{position:absolute;inset:0;overflow:hidden;line-height:1;opacity:1;text-align:initial;-webkit-text-size-adjust:none;text-size-adjust:none;forced-color-adjust:none;transform-origin:0 0;z-index:2;word-break:normal}
 .textLayer span,.textLayer br{color:transparent;position:absolute;white-space:pre;cursor:text;transform-origin:0% 0%}
+.textLayer .endOfContent{display:block;position:absolute;inset:100% 0 0;z-index:-1;cursor:default;user-select:none}
+.textLayer.selecting .endOfContent{top:0}
+.textLayer br::selection{background:transparent}
 .textLayer ::selection{background:rgba(52,70,168,.28)}
 #reader.pdf #page{overflow:hidden}
 #reader.pdf.fitw #page{overflow-y:auto;overscroll-behavior:contain}
@@ -424,6 +429,7 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const coarse = matchMedia('(pointer: coarse)').matches;
+const withTimeout = (p, ms, v = null) => Promise.race([p, new Promise(r => setTimeout(() => r(v), ms))]);
 const uid = p => p + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 
 /* ================= storage (IndexedDB, memory fallback) ================= */
@@ -725,7 +731,7 @@ const coverUrls = new Map();
 function coverHTML(meta) {
   if (meta.cover) {
     if (!coverUrls.has(meta.id)) coverUrls.set(meta.id, URL.createObjectURL(new Blob([meta.cover], { type: meta.coverType || 'image/jpeg' })));
-    return `<div class="cover"><img src="${coverUrls.get(meta.id)}" alt=""></div>`;
+    return `<div class="cover"><img src="${coverUrls.get(meta.id)}" alt="" draggable="false"></div>`;
   }
   let h = 0; for (const c of meta.title) h = (h * 31 + c.charCodeAt(0)) >>> 0;
   return `<div class="cover gen" style="background:${COVER_COLORS[h % COVER_COLORS.length]}"><span class="t">${esc(meta.title)}</span><span class="a">${esc(meta.author || (meta.format === 'txt' ? '텍스트 파일' : ''))}</span></div>`;
@@ -884,7 +890,7 @@ async function importFiles(files) {
       } else if (ext === 'pdf' || f.type === 'application/pdf') {
         const b = await loadPdf(buf, f.name), g = guessMeta(f.name);
         meta = { id, format: 'pdf', title: g.title, author: g.author || b.author, addedAt: Date.now() };
-        const cv = await b.coverData().catch(() => null); if (cv) { meta.cover = cv.buf; meta.coverType = cv.type; }
+        const cv = await withTimeout(b.coverData().catch(() => null), 6000); if (cv) { meta.cover = cv.buf; meta.coverType = cv.type; }
       } else if (ext === 'txt' || f.type.startsWith('text/')) {
         meta = { id, format: 'txt', title: f.name.replace(/\.txt$/i, ''), author: '', addedAt: Date.now() };
       } else { toast(`${f.name}: EPUB, PDF, TXT 파일만 열 수 있어요`); continue; }
@@ -923,7 +929,7 @@ async function openBook(id) {
         const g = guessMeta(name);
         m.title = fmt === 'epub' && book.title && book.title !== '제목 없음' ? book.title : g.title;
         m.author = fmt === 'epub' ? book.author || g.author : g.author || book.author || '';
-        const cv = fmt !== 'txt' ? await book.coverData().catch(() => null) : null;
+        const cv = fmt !== 'txt' ? await withTimeout(book.coverData().catch(() => null), 6000) : null;
         if (cv) { m.cover = cv.buf; m.coverType = cv.type; }
       }
       m.name = name;
@@ -2219,7 +2225,8 @@ async function renderPdf(ch, target = {}, animate = true) {
     text.style.setProperty('--scale-factor', scale);
     box.append(canvas, marks, text); wrap.appendChild(box);
     jobs.push(pg.render({ canvasContext: canvas.getContext('2d'), viewport: vp, transform: dpr !== 1 ? [dpr, 0, 0, dpr, 0, 0] : null }).promise.catch(() => {}));
-    jobs.push(pg.getTextContent().then(tc => lib.renderTextLayer({ textContentSource: tc, container: text, viewport: vp, textDivs: [] }).promise).catch(() => {}));
+    jobs.push(pg.getTextContent().then(tc => lib.renderTextLayer({ textContentSource: tc, container: text, viewport: vp, textDivs: [] }).promise)
+      .then(() => text.appendChild(Object.assign(document.createElement('div'), { className: 'endOfContent' }))).catch(() => {}));
   }
   if (tok !== renderToken) return;
   content.replaceChildren(wrap);
@@ -2229,6 +2236,9 @@ async function renderPdf(ch, target = {}, animate = true) {
   afterMove();
   R.pdfDrawn = Promise.all(jobs); // drawing finishes in the background; callers don't wait for it
 }
+// while selecting, the end-of-content box covers the page so the selection doesn't leap to the other page
+document.addEventListener('pointerdown', e => { const tl = e.target.closest?.('.textLayer'); if (tl) tl.classList.add('selecting'); });
+document.addEventListener('pointerup', () => $$('.textLayer.selecting').forEach(t => t.classList.remove('selecting')));
 async function pdfTurn(dir) {
   const n = R.book.chapters.length, step = reader.classList.contains('spread') ? 2 : 1;
   if (S.pdfFit === 'width') { // read down the page first
@@ -2247,8 +2257,21 @@ async function pdfTurn(dir) {
 function pdfRectsFromSelection() {
   const sel = getSelection(); if (!sel.rangeCount || sel.isCollapsed) return null;
   const boxes = $$('.pdf-page', content).map(b => [b, b.getBoundingClientRect()]), out = [];
-  for (const r of sel.getRangeAt(0).getClientRects()) {
-    if (r.width < 1 || r.height < 1) continue;
+  const range = sel.getRangeAt(0), rects = [];
+  const root = range.commonAncestorContainer.nodeType === 3 ? range.commonAncestorContainer.parentNode : range.commonAncestorContainer;
+  const w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  for (let n = w.currentNode.nodeType === 3 ? w.currentNode : w.nextNode(); n; n = w.nextNode()) {
+    if (!range.intersectsNode(n) || !n.parentElement?.closest('.textLayer')) continue;
+    const a = n === range.startContainer ? range.startOffset : 0, z = n === range.endContainer ? range.endOffset : n.nodeValue.length;
+    let s0 = a, e0 = z; // trim surrounding spaces so blank runs leave no mark
+    while (s0 < e0 && /\s/.test(n.nodeValue[s0])) s0++;
+    while (e0 > s0 && /\s/.test(n.nodeValue[e0 - 1])) e0--;
+    if (s0 >= e0) continue;
+    const rr = document.createRange(); rr.setStart(n, s0); rr.setEnd(n, e0);
+    rects.push(...rr.getClientRects());
+  }
+  for (const r of rects) {
+    if (r.width < 2 || r.height < 2) continue;
     const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
     const hit = boxes.find(([, br]) => cx >= br.left && cx <= br.right && cy >= br.top && cy <= br.bottom); if (!hit) continue;
     const [box, br] = hit;
@@ -2440,6 +2463,7 @@ function addToCol(colId, bookId) {
 /* --- drag a cover onto a collection: mouse drags right away, touch after a long press --- */
 const DRAG = { on: false, timer: 0 };
 $('#grid').addEventListener('contextmenu', e => { if (e.target.closest('.cover-btn')) e.preventDefault(); });
+$('#library').addEventListener('dragstart', e => { if (e.target.closest?.('.cover-btn, .continue')) e.preventDefault(); });
 $('#grid').addEventListener('pointerdown', e => {
   const btn = e.target.closest('.cover-btn'); if (!btn || e.button > 0) return;
   const id = btn.dataset.open; if (!id || id === 'sample') return;
