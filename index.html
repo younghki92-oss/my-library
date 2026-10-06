@@ -247,6 +247,18 @@ input[type=range]{width:100%;accent-color:var(--accent);margin:0}
 .sb-sub{border-top:1px solid color-mix(in srgb,var(--r-bg) 22%,transparent);padding-top:3px;justify-content:space-between}
 .sb-sub button{flex:1;white-space:nowrap}
 mark.pend{background:var(--hl-yellow);color:inherit;outline:1.5px dashed var(--accent);outline-offset:1px;border-radius:2px}
+#pop{position:fixed;z-index:31;width:min(380px,calc(100vw - 24px));max-height:min(52vh,460px);display:flex;flex-direction:column;background:var(--r-panel);color:var(--r-fg);border:1px solid var(--r-rule);border-radius:14px;box-shadow:0 12px 36px rgba(0,0,0,.28);animation:fade .15s;box-sizing:border-box}
+#pop .pop-head{display:flex;align-items:center;gap:6px;padding:8px 8px 6px 16px;border-bottom:1px solid var(--r-rule)}
+#pop .pop-head b{flex:1;font-size:13px;font-weight:600;color:var(--r-muted)}
+#pop .pop-head button{width:32px;height:32px;border:0;background:none;color:var(--r-fg);border-radius:8px;cursor:pointer;font-size:18px;line-height:1}
+#pop .pop-head button:hover{background:color-mix(in srgb,var(--r-fg) 8%,transparent)}
+#popBody{overflow-y:auto;padding:12px 16px 14px;overscroll-behavior:contain}
+#popBody .tool-quote{-webkit-line-clamp:2;font-size:13.5px;margin-top:0}
+#popBody .tr-out{font-size:15px;padding:10px 12px}
+#popBody .seg button{padding:7px 6px;font-size:13px}
+#popBody .tool-sub{margin-top:14px}
+#popBody .dict-word{font-size:20px}
+#popBody .dict-lang{margin:10px 0 2px} #popBody .dict-pos{margin:2px 0 4px} #popBody .dict-defs{font-size:14.5px}
 #extbar{position:absolute;z-index:6;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 40px);display:flex;align-items:center;gap:4px;padding:5px 5px 5px 16px;border-radius:999px;background:var(--r-fg);color:var(--r-bg);box-shadow:0 8px 24px rgba(0,0,0,.25);font-size:13.5px;white-space:nowrap;max-width:calc(100% - 24px);animation:fade .2s}
 #extbar span{overflow:hidden;text-overflow:ellipsis}
 #extbar button{border:0;background:color-mix(in srgb,var(--r-bg) 14%,transparent);color:inherit;cursor:pointer;height:34px;border-radius:999px;padding:0 14px;font-size:13px;flex:none}
@@ -325,6 +337,7 @@ mark.pend{background:var(--hl-yellow);color:inherit;outline:1.5px dashed var(--a
   </aside>
   <div id="selbar" hidden></div>
   <div class="handle hs" id="hS" hidden></div><div class="handle he" id="hE" hidden></div>
+  <div id="pop" hidden role="dialog" aria-label="번역과 사전"><div class="pop-head"><b id="popTitle"></b><button id="popClose" aria-label="닫기">×</button></div><div id="popBody"></div></div>
   <div id="extbar" hidden><span id="extHint"></span><button id="extNext">다음 쪽 ›</button><button id="extCancel">취소</button></div>
 </section>
 <div id="toast" role="status" aria-live="polite"></div>
@@ -838,7 +851,7 @@ function cardStatus(id, text) {
 }
 function closeReader() {
   if (!R.book) return;
-  cancelExtend(); hideHandles(); saveNow(); closeSheet(); hideSelbar();
+  cancelExtend(); hideHandles(); closePop(); saveNow(); closeSheet(); hideSelbar();
   R.book = null; reader.hidden = true; library.hidden = false;
   releaseWake(); renderLibrary();
 }
@@ -870,7 +883,7 @@ async function renderChapter(ch, target = {}, animate = true) {
   const frag = await R.book.getHTML(ch);
   if (tok !== renderToken || !R.book) return;
   if (R.ext && ch !== R.ext.ch) cancelExtend();
-  R.edit = null; hS.hidden = hE.hidden = true;
+  R.edit = null; hS.hidden = hE.hidden = true; closePop();
   R.ch = ch;
   hideSelbar();
   content.replaceChildren(...frag.childNodes);
@@ -954,7 +967,7 @@ function goPage(p, animate = true) {
 }
 function afterMove() { if (!R.relaying) R.anchor = currentAnchor(); if (R.edit) positionHandles(); updateChrome(); scheduleSave(); }
 async function next() {
-  hideSelbar(); hideHandles();
+  hideSelbar(); hideHandles(); closePop();
   const last = R.ch >= R.book.chapters.length - 1;
   if (S.mode === 'paged') {
     if (R.page < R.pages - 1) goPage(R.page + 1);
@@ -968,7 +981,7 @@ async function next() {
   reader.classList.add('ui-hidden');
 }
 async function prev() {
-  hideSelbar(); hideHandles();
+  hideSelbar(); hideHandles(); closePop();
   if (S.mode === 'paged') {
     if (R.page > 0) goPage(R.page - 1);
     else if (R.ext) { goPage(0); toast('같은 장 안에서만 이어서 칠할 수 있어요'); }
@@ -1397,7 +1410,7 @@ selbar.addEventListener('click', e => {
     if (!p) return hideSelbar();
     const text = (h ? h.text : rangeText(p.s, p.e)).trim();
     hideSelbar(); hideHandles(); getSelection().removeAllRanges();
-    return openSheet(act, { ch: R.ch, s: p.s, e: p.e, hid: h?.id || null, text });
+    return openPop(act, { ch: R.ch, s: p.s, e: p.e, hid: h?.id || null, text }, selbar._rect);
   }
   hideSelbar();
   if (act !== 'sentence' && act !== 'para') hideHandles();
@@ -1435,7 +1448,7 @@ function onTap(e) {
   if (e.target.closest('#content a')) return;
   const m = e.target.closest('mark.ann');
   if (m) { editAnnotation(m.dataset.hid); return; }
-  if (!selbar.hidden || R.edit) { hideSelbar(); hideHandles(); return; }
+  if (!selbar.hidden || R.edit || POP.on) { hideSelbar(); hideHandles(); closePop(); return; }
   const x = e.clientX / innerWidth;
   if (S.mode === 'paged' && x < .26) prev();
   else if (S.mode === 'paged' && x > .74) next();
@@ -1461,6 +1474,7 @@ document.addEventListener('keydown', e => {
   if (!R.book || reader.hidden) return;
   if (e.target.closest('input,textarea,select')) { if (e.key === 'Escape') closeSheet(); return; }
   if (!sheet.hidden) { if (e.key === 'Escape') closeSheet(); return; }
+  if (POP.on && e.key === 'Escape') { closePop(); return; }
   if (R.ext && e.key === 'Escape') { cancelExtend(); return; }
   if (R.edit && e.key === 'Escape') { hideSelbar(); hideHandles(); return; }
   if (e.metaKey || e.ctrlKey || e.altKey) return;
@@ -1477,14 +1491,42 @@ $$('[data-sheet]').forEach(b => b.onclick = () => openSheet(b.dataset.sheet));
 $('#sheetClose').onclick = closeSheet;
 $('#scrim').onclick = closeSheet;
 function openSheet(kind, arg) {
-  hideSelbar(); hideHandles(); sheetKind = kind;
+  closePop(); hideSelbar(); hideHandles(); sheetKind = kind;
   $('#scrim').hidden = false; sheet.hidden = false;
   const titles = { toc: '목차', search: '책에서 찾기', notes: '하이라이트와 책갈피', settings: '보기 설정', memo: '메모', translate: '번역', dict: '사전' };
   $('#sheetTitle').textContent = titles[kind];
   ({ toc: renderToc, search: renderSearch, notes: renderNotes, settings: renderSettings, memo: renderMemo, translate: renderTranslate, dict: renderDict })[kind](arg);
 }
 function closeSheet() { sheet.hidden = true; $('#scrim').hidden = true; sheetKind = null; }
-const body = () => $('#sheetBody');
+const body = () => (POP.on ? $('#popBody') : $('#sheetBody'));
+
+/* --- floating card for translation and dictionary, anchored to the selection --- */
+const pop = $('#pop'), POP = { on: false, rect: null, marks: [] };
+function openPop(kind, arg, rect) {
+  closeSheet();
+  POP.on = true; POP.rect = rect;
+  if (arg.ch === R.ch) { // keep the looked-up words marked while the card is open
+    const sp = posToPoint(arg.s), ep = posToPoint(arg.e);
+    if (sp && ep) POP.marks = wrapRange(sp, ep, () => Object.assign(document.createElement('mark'), { className: 'pend' }));
+  }
+  $('#popTitle').textContent = kind === 'dict' ? '사전' : '번역';
+  pop.hidden = false;
+  (kind === 'dict' ? renderDict : renderTranslate)(arg);
+  placePop();
+}
+function placePop() {
+  if (!POP.on || !POP.rect) return;
+  const r = POP.rect, w = pop.offsetWidth, h = pop.offsetHeight, gap = 12, m = 8;
+  const below = innerHeight - r.bottom - gap - m, above = r.top - gap - m;
+  let y = below >= h || below >= above ? r.bottom + gap : r.top - gap - h;
+  y = clamp(y, m + (parseFloat(getComputedStyle(document.documentElement).paddingTop) || 0), innerHeight - h - m);
+  const x = clamp(r.left + r.width / 2 - w / 2, m, innerWidth - w - m);
+  Object.assign(pop.style, { left: x + 'px', top: y + 'px' });
+}
+function closePop() { if (!POP.on) return; POP.on = false; pop.hidden = true; $('#popBody').innerHTML = ''; POP.marks.forEach(unwrap); POP.marks = []; }
+new ResizeObserver(placePop).observe(pop); // results arrive later and change its height
+$('#popClose').onclick = closePop;
+addEventListener('resize', closePop);
 
 function renderToc() {
   const toc = R.book.toc.length ? R.book.toc : R.book.chapters.map((_, i) => ({ label: `${i + 1}장`, ch: i, depth: 0 }));
