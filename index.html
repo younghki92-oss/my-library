@@ -1794,7 +1794,7 @@ function noteOn(arg, entry) { // append a line to the passage's note, highlighti
 }
 
 /* --- translate --- */
-const TR = { target: ls.get('yb-tr-target', null), dev: {} };
+const TR = { dev: {} };
 // lookups are remembered (this device only), so a word looked up once comes back instantly
 const LK = new Map(Object.entries(ls.get('yb-lk', {})));
 function lkSet(k, v) {
@@ -1859,9 +1859,10 @@ async function translateMyMemory(text, from, to) { // chunks in parallel
   }));
   return out.join(' ').replace(/\s+\n/g, '\n').trim();
 }
-function renderTranslate(arg) {
+// English → Korean, Korean → English every time; French is only a one-off choice for the current passage
+function renderTranslate(arg, pick) {
   const from = detectLang(arg.text);
-  const to = TR.target && TR.target !== from ? TR.target : (from === 'ko' ? 'en' : 'ko');
+  const to = pick && pick !== from ? pick : (from === 'ko' ? 'en' : 'ko');
   const tl = to, q = encodeURIComponent(arg.text.slice(0, 2000));
   body().innerHTML = `<blockquote class="tool-quote">${esc(arg.text)}</blockquote>
     <div class="seg" style="margin-bottom:12px">${LANGS.filter(([c]) => c !== from).map(([c, n]) => `<button data-to="${c}" aria-pressed="${c === to}">${n}</button>`).join('')}</div>
@@ -1873,7 +1874,7 @@ function renderTranslate(arg) {
   let result = '';
   body().onclick = e => {
     const b = e.target.closest('button'); if (!b) return;
-    if (b.dataset.to) { TR.target = b.dataset.to; ls.set('yb-tr-target', TR.target); renderTranslate(arg); }
+    if (b.dataset.to) renderTranslate(arg, b.dataset.to);
     else if ('copy' in b.dataset) copyText(result);
     else if ('save' in b.dataset && result) noteOn(arg, `[번역 · ${LANGS.find(l => l[0] === to)[1]}]\n${result}`);
   };
