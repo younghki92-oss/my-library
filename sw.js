@@ -1,5 +1,5 @@
 // 여백 리더 service worker: 앱 껍데기와 글꼴을 캐시해 오프라인에서도 열리게 한다.
-const CACHE = 'yeobaek-v15';
+const CACHE = 'yeobaek-v16';
 const SHELL = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png',
   'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js'];
 
