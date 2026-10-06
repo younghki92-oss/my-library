@@ -1,5 +1,5 @@
 // 여백 리더 service worker: 앱 껍데기와 글꼴을 캐시해 오프라인에서도 열리게 한다.
-const CACHE = 'yeobaek-v9';
+const CACHE = 'yeobaek-v10';
 const SHELL = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png',
   'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js'];
 
@@ -20,7 +20,8 @@ self.addEventListener('fetch', e => {
   if (!cacheable) return;
   // 페이지 자체는 네트워크 우선: 새 버전이 바로 반영되고, 오프라인이면 캐시로 연다.
   if (e.request.mode === 'navigate') {
-    e.respondWith(fetch(e.request).then(res => {
+    // revalidate past the browser's HTTP cache (GitHub Pages sends max-age=600), so a push shows up on the next open
+    e.respondWith(fetch(e.request.url, { cache: 'no-cache', credentials: 'same-origin' }).then(res => {
       const copy = res.clone(); caches.open(CACHE).then(c => c.put('./index.html', copy)); return res;
     }).catch(() => caches.match('./index.html')));
     return;
