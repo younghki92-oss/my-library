@@ -304,6 +304,10 @@ input[type=range]{width:100%;accent-color:var(--accent);margin:0}
 .sb-sub{border-top:1px solid color-mix(in srgb,var(--r-bg) 22%,transparent);padding-top:3px;justify-content:space-between}
 .sb-sub button{flex:1;white-space:nowrap}
 mark.pend{background:var(--hl-yellow);color:inherit;outline:1.5px dashed var(--accent);outline-offset:1px;border-radius:2px}
+/* touch: the reader does its own selection (no Android selection toolbar) */
+#reader.touchsel #content{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+#reader.touchsel.tsel-on #content{-webkit-user-select:text;user-select:text}
+.lp-hint{position:fixed;z-index:6;background:var(--accent-soft);outline:2px solid var(--accent);border-radius:3px;pointer-events:none;animation:fade .12s}
 #pop{position:fixed;z-index:31;width:min(380px,calc(100vw - 24px));max-height:min(52vh,460px);display:flex;flex-direction:column;background:var(--r-panel);color:var(--r-fg);border:1px solid var(--r-rule);border-radius:14px;box-shadow:0 12px 36px rgba(0,0,0,.28);animation:fade .15s;box-sizing:border-box}
 #pop[data-side]::before{content:"";position:absolute;top:calc(var(--ay,40px) - 8px);width:15px;height:15px;background:var(--r-panel);border:1px solid var(--r-rule);transform:rotate(45deg)}
 #pop[data-side="right"]::before{left:-8.5px;border-top-color:transparent;border-right-color:transparent}
@@ -1298,8 +1302,8 @@ const hS = $('#hS'), hE = $('#hE');
 let hdrag = null;
 function annRects(id) { const out = []; for (const m of marksOf(id)) for (const r of m.getClientRects()) if (r.width) out.push(r); return out; }
 function positionHandles() {
-  if (!R.edit || findH(R.edit.id)?.pdf) { hS.hidden = hE.hidden = true; return; } // PDF marks have no drag handles
-  const rs = annRects(R.edit.id), pr = page.getBoundingClientRect();
+  if (!R.edit || (!R.edit.sel && findH(R.edit.id)?.pdf)) { hS.hidden = hE.hidden = true; return; } // PDF marks have no drag handles
+  const rs = R.edit.sel ? (getSelection().rangeCount ? [...getSelection().getRangeAt(0).getClientRects()].filter(r => r.width) : []) : annRects(R.edit.id), pr = page.getBoundingClientRect();
   const vis = r => r && r.right > pr.left - 2 && r.left < pr.right + 2 && r.bottom > pr.top && r.top < pr.bottom;
   const place = (el, r, x) => {
     if (hdrag && el === hdrag.el) return; // the dragged one follows the finger
@@ -1321,7 +1325,7 @@ function editAnnotation(id) {
   if (!R.edit) return;
   e.preventDefault(); e.stopPropagation();
   const box = el.getBoundingClientRect();
-  hdrag = { which: el === hS ? 's' : 'e', el, h: findH(R.edit.id), dy: e.clientY - (box.top + box.height / 2), x: e.clientX, y: e.clientY, raf: 0, edgeDir: 0, edgeT: 0 };
+  hdrag = { which: el === hS ? 's' : 'e', el, sel: !!R.edit.sel, h: R.edit.sel ? null : findH(R.edit.id), dy: e.clientY - (box.top + box.height / 2), x: e.clientX, y: e.clientY, raf: 0, edgeDir: 0, edgeT: 0 };
   hideSelbar(); reader.classList.add('dragging');
 }));
 addEventListener('pointermove', e => {
@@ -1336,6 +1340,17 @@ addEventListener('pointermove', e => {
 function dragStep(d = hdrag) {
   if (!d) return; d.raf = 0;
   const c = caretAt(d.x, d.y); if (!c || !content.contains(c.node)) return;
+  if (d.sel) { // move one end of the selection, keeping the other where it is
+    const sel = getSelection(); if (!sel.rangeCount) return;
+    const r = sel.getRangeAt(0), nr = document.createRange();
+    try {
+      if (d.which === 'e') { nr.setStart(r.startContainer, r.startOffset); nr.setEnd(c.node, c.offset); }
+      else { nr.setStart(c.node, c.offset); nr.setEnd(r.endContainer, r.endOffset); }
+    } catch { return; }
+    if (nr.collapsed) return;
+    sel.removeAllRanges(); sel.addRange(nr); positionHandles();
+    return;
+  }
   const p = rangeToPos(c.node, c.offset), h = d.h; if (!p) return;
   if (d.which === 'e') { if (cmpPos(p, h.s) <= 0 || !cmpPos(p, h.e)) return; h.e = p; }
   else { if (cmpPos(p, h.e) >= 0 || !cmpPos(p, h.s)) return; h.s = p; }
@@ -1366,6 +1381,7 @@ function endDrag() {
   if (d.raf) { cancelAnimationFrame(d.raf); dragStep(d); } // apply the final finger position
   hdrag = null;
   reader.classList.remove('dragging');
+  if (d.sel) { const sel = getSelection(); if (sel.rangeCount) { positionHandles(); showSelbar(visibleRect(sel.getRangeAt(0)), 'new'); } return; }
   d.h.text = rangeText(d.h.s, d.h.e); saveNow();
   editAnnotation(d.h.id);
 }
@@ -1382,9 +1398,9 @@ function onSelection() {
     if (has) { const r = s.getRangeAt(0), a = rangeToPos(r.startContainer, r.startOffset), b = rangeToPos(r.endContainer, r.endOffset); s.removeAllRanges(); if (a && b) finishExtend(a, b, false); }
     return;
   }
-  if (!has) { if (selbar.dataset.mode === 'new') hideSelbar(); return; }
+  if (!has) { if (selbar.dataset.mode === 'new') hideSelbar(); endTouchSelect(); return; }
   if (hdrag) return;
-  hideHandles();
+  if (R.edit?.sel) positionHandles(); else hideHandles();
   showSelbar(visibleRect(s.getRangeAt(0)), 'new');
 }
 // the part of a (possibly multi-page) range that is on screen right now
@@ -1562,7 +1578,30 @@ selbar.addEventListener('click', e => {
 /* ================= input: tap, swipe, wheel, keys ================= */
 let ptr = null;
 // right-click selects the word under the pointer (if nothing is selected) and shows only the reader's menu
+function wordRangeAt(x, y) {
+  const c = caretAt(x, y);
+  if (!c || c.node.nodeType !== 3 || !content.contains(c.node)) return null;
+  const t = c.node.nodeValue, isW = ch => /[\p{L}\p{N}'’\-]/u.test(ch || '');
+  let a = c.offset, b = c.offset;
+  while (a > 0 && isW(t[a - 1])) a--;
+  while (b < t.length && isW(t[b])) b++;
+  if (a === b) return null;
+  const r = document.createRange(); r.setStart(c.node, a); r.setEnd(c.node, b);
+  return r;
+}
+// select a range programmatically and give it the reader's own handles + menu (used for touch)
+function touchSelect(r) {
+  reader.classList.add('tsel-on');
+  const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r);
+  clearTimeout(selT); closePop();
+  R.edit = { sel: true }; positionHandles();
+  showSelbar(visibleRect(r), 'new');
+}
+function endTouchSelect() { reader.classList.remove('tsel-on'); if (R.edit?.sel) { R.edit = null; positionHandles(); } }
+const LP = { t: 0, hint: [] };
+function lpClear() { clearTimeout(LP.t); LP.hint.forEach(h => h.remove()); LP.hint = []; }
 stage.addEventListener('contextmenu', e => {
+  if (coarse) { if (content.contains(e.target)) e.preventDefault(); return; } // touch long-press is handled by our own timer
   if (!R.book || !content.contains(e.target)) return;
   e.preventDefault();
   if (R.ext) return;
@@ -1571,31 +1610,48 @@ stage.addEventListener('contextmenu', e => {
   if (!inSel) {
     const m = e.target.closest('mark.ann') || (R.book?.isPdf && pdfMarkAt(e.clientX, e.clientY));
     if (m) { sel.removeAllRanges(); return editAnnotation(m.dataset.hid); }
-    const c = caretAt(e.clientX, e.clientY);
-    if (!c || c.node.nodeType !== 3) return;
-    const t = c.node.nodeValue, isW = ch => /[\p{L}\p{N}'’\-]/u.test(ch || '');
-    let a = c.offset, b = c.offset;
-    while (a > 0 && isW(t[a - 1])) a--;
-    while (b < t.length && isW(t[b])) b++;
-    if (a === b) return;
-    const r = document.createRange(); r.setStart(c.node, a); r.setEnd(c.node, b);
+    const r = wordRangeAt(e.clientX, e.clientY); if (!r) return;
     sel.removeAllRanges(); sel.addRange(r);
   }
   clearTimeout(selT); hideHandles(); closePop();
   showSelbar(visibleRect(sel.getRangeAt(0)), 'new');
 });
-stage.addEventListener('pointerdown', e => { if (e.button > 0) return; ptr = { x: e.clientX, y: e.clientY, t: Date.now(), type: e.pointerType, drag: false }; });
+stage.addEventListener('pointerdown', e => {
+  if (e.button > 0) return;
+  ptr = { x: e.clientX, y: e.clientY, t: Date.now(), type: e.pointerType, drag: false };
+  lpClear();
+  if (R.edit?.sel) { // touching the page again ends a touch selection (and keeps Android's own selection from starting)
+    getSelection().removeAllRanges(); endTouchSelect(); hideSelbar(); ptr.dismissed = true;
+  }
+  if (e.pointerType !== 'mouse' && R.book && !R.ext && content.contains(e.target)) {
+    const p0 = ptr;
+    LP.t = setTimeout(() => { // long press: show which word will be selected; it is selected when the finger lifts
+      if (ptr !== p0 || p0.drag) return;
+      const r = wordRangeAt(p0.x, p0.y); if (!r) return;
+      p0.long = r; navigator.vibrate?.(12);
+      LP.hint = [...r.getClientRects()].filter(x => x.width).map(x => {
+        const d = Object.assign(document.createElement('div'), { className: 'lp-hint' });
+        Object.assign(d.style, { left: x.left - 2 + 'px', top: x.top - 1 + 'px', width: x.width + 4 + 'px', height: x.height + 2 + 'px' });
+        document.body.appendChild(d); return d;
+      });
+    }, 300);
+  }
+});
 stage.addEventListener('pointermove', e => {
-  if (!ptr || ptr.type === 'mouse' || S.mode !== 'paged') return;
+  if (ptr && !ptr.long && Math.hypot(e.clientX - ptr.x, e.clientY - ptr.y) > 8) lpClear(); // moved: a scroll or swipe, not a long press
+  if (!ptr || ptr.type === 'mouse' || S.mode !== 'paged' || ptr.long) return;
   const dx = e.clientX - ptr.x, dy = e.clientY - ptr.y;
   if (!getSelection().isCollapsed) return;
   if (!ptr.drag && Math.abs(dx) > 10 && Math.abs(dx) > Math.abs(dy) * 1.2) ptr.drag = true;
   if (ptr.drag) { content.style.transition = 'none'; content.style.transform = `translate3d(${-R.page * R.step + dx}px,0,0)`; }
 });
-stage.addEventListener('pointercancel', () => { if (ptr?.drag) goPage(R.page); ptr = null; });
+stage.addEventListener('pointercancel', () => { lpClear(); if (ptr?.drag) goPage(R.page); ptr = null; });
 stage.addEventListener('pointerup', e => {
   if (!ptr) return;
   const p = ptr; ptr = null;
+  lpClear();
+  if (p.long) return touchSelect(p.long);
+  if (p.dismissed && !p.drag) return;
   const dx = e.clientX - p.x, dy = e.clientY - p.y, dt = Date.now() - p.t;
   if (p.drag) { if (Math.abs(dx) > 50 || (Math.abs(dx) > 20 && dt < 250)) dx < 0 ? next() : prev(); else goPage(R.page); return; }
   if (!getSelection().isCollapsed) return;
@@ -1848,6 +1904,7 @@ function changeSetting(k, v) {
   }
 }
 function applySettings() {
+  reader.classList.toggle('touchsel', coarse);
   reader.dataset.rt = S.theme;
   const st = reader.style;
   st.setProperty('--r-font', FONTS[S.font]?.stack || FONTS.gowun.stack);
