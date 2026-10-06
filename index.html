@@ -84,6 +84,8 @@ svg.i{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.7;stro
   #sideToggle{display:inline-flex;align-items:center;justify-content:center}
 }
 .cover img{-webkit-user-drag:none;user-select:none}
+/* a corner ribbon marks PDFs on the shelf */
+.pdf-band{position:absolute;top:9%;right:-34%;width:100%;transform:rotate(45deg);background:#B23A3E;color:#fff;font:700 clamp(8px,1.1vw,11px)/1 var(--f-ui);letter-spacing:.14em;text-align:center;padding:4px 0;box-shadow:0 1px 4px rgba(0,0,0,.35);z-index:2;pointer-events:none}
 .drag-ghost .cover{width:64px}
 .drag-ghost{position:fixed;z-index:80;width:64px;pointer-events:none;transform:translate(-50%,-60%) rotate(-4deg);opacity:.92;filter:drop-shadow(0 10px 18px rgba(0,0,0,.35))}
 .card.dragging{opacity:.4}
@@ -729,12 +731,13 @@ const library = $('#library'), reader = $('#reader');
 const COVER_COLORS = ['#2E3A6B', '#5B3A5E', '#2F5548', '#7A4A2E', '#3D4A5C', '#6B2E3A', '#4F5530'];
 const coverUrls = new Map();
 function coverHTML(meta) {
+  const band = meta.format === 'pdf' ? '<span class="pdf-band">PDF</span>' : '';
   if (meta.cover) {
     if (!coverUrls.has(meta.id)) coverUrls.set(meta.id, URL.createObjectURL(new Blob([meta.cover], { type: meta.coverType || 'image/jpeg' })));
-    return `<div class="cover"><img src="${coverUrls.get(meta.id)}" alt="" draggable="false"></div>`;
+    return `<div class="cover"><img src="${coverUrls.get(meta.id)}" alt="" draggable="false">${band}</div>`;
   }
   let h = 0; for (const c of meta.title) h = (h * 31 + c.charCodeAt(0)) >>> 0;
-  return `<div class="cover gen" style="background:${COVER_COLORS[h % COVER_COLORS.length]}"><span class="t">${esc(meta.title)}</span><span class="a">${esc(meta.author || (meta.format === 'txt' ? '텍스트 파일' : ''))}</span></div>`;
+  return `<div class="cover gen" style="background:${COVER_COLORS[h % COVER_COLORS.length]}"><span class="t">${esc(meta.title)}</span><span class="a">${esc(meta.author || (meta.format === 'txt' ? '텍스트 파일' : ''))}</span>${band}</div>`;
 }
 const isDrive = id => typeof id === 'string' && id.startsWith('d:');
 // title/author the reader sees: own edit (synced) > the EPUB's metadata > a guess from the file name
