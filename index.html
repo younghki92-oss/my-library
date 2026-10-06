@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>My Library</title>
 <meta name="theme-color" content="#F3F4F7" id="themeColor">
+<meta name="color-scheme" content="light dark">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -182,9 +183,7 @@ dialog.lib-dlg::backdrop{background:var(--scrim)}
 #content pre{white-space:pre-wrap;font-size:.85em}
 #content hr{border:0;border-top:1px solid var(--r-rule);margin:1.5em 20%}
 /* on dark pages a see-through tint turns muddy (yellow becomes brown): use a real highlighter there, with dark ink */
-#reader[data-rt="night"]{--hl-yellow:rgba(250,206,40,.86);--hl-green:rgba(112,206,140,.82);--hl-blue:rgba(122,170,255,.82);--hl-pink:rgba(255,135,172,.82);--hl-purple:rgba(182,146,255,.82);--hl-orange:rgba(255,168,88,.84);--hl-ink:#14161B}
-@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]) #reader[data-rt="auto"]{--hl-yellow:rgba(250,206,40,.86);--hl-green:rgba(112,206,140,.82);--hl-blue:rgba(122,170,255,.82);--hl-pink:rgba(255,135,172,.82);--hl-purple:rgba(182,146,255,.82);--hl-orange:rgba(255,168,88,.84);--hl-ink:#14161B} }
-:root[data-theme="dark"] #reader[data-rt="auto"]{--hl-yellow:rgba(250,206,40,.86);--hl-green:rgba(112,206,140,.82);--hl-blue:rgba(122,170,255,.82);--hl-pink:rgba(255,135,172,.82);--hl-purple:rgba(182,146,255,.82);--hl-orange:rgba(255,168,88,.84);--hl-ink:#14161B}
+#reader.darkpage{--hl-yellow:rgba(250,206,40,.86);--hl-green:rgba(112,206,140,.82);--hl-blue:rgba(122,170,255,.82);--hl-pink:rgba(255,135,172,.82);--hl-purple:rgba(182,146,255,.82);--hl-orange:rgba(255,168,88,.84);--hl-ink:#14161B}
 mark.ann.hl{color:var(--hl-ink,inherit)}
 mark.ann{color:inherit;background:transparent;border-radius:2px;cursor:pointer;-webkit-box-decoration-break:clone;box-decoration-break:clone}
 mark.hl.c-yellow{background:var(--hl-yellow)} mark.hl.c-green{background:var(--hl-green)} mark.hl.c-blue{background:var(--hl-blue)} mark.hl.c-pink{background:var(--hl-pink)} mark.hl.c-purple{background:var(--hl-purple)} mark.hl.c-orange{background:var(--hl-orange)}
@@ -1927,6 +1926,7 @@ function changeSetting(k, v) {
 }
 function applySettings() {
   reader.classList.toggle('touchsel', coarse);
+  setTimeout(syncThemeColor);
   reader.dataset.rt = S.theme;
   const st = reader.style;
   st.setProperty('--r-font', FONTS[S.font]?.stack || FONTS.gowun.stack);
@@ -2872,6 +2872,8 @@ if ('launchQueue' in window) launchQueue.setConsumer(async p => { if (p.files?.l
 function syncThemeColor() {
   const el = reader.hidden ? document.body : reader;
   const c = getComputedStyle(el).backgroundColor;
+  const [r, g, b] = (getComputedStyle(reader).backgroundColor.match(/\d+(\.\d+)?/g) || [255, 255, 255]).map(Number);
+  reader.classList.toggle('darkpage', 0.2126 * r + 0.7152 * g + 0.0722 * b < 110); // dark page → solid highlighter colours
   const m = $('#themeColor'); if (m && c) m.setAttribute('content', c);
 }
 new MutationObserver(syncThemeColor).observe(reader, { attributes: true, attributeFilter: ['hidden', 'data-rt'] });
