@@ -280,6 +280,11 @@ input[type=range]{width:100%;accent-color:var(--accent);margin:0}
 .sb-sub button{flex:1;white-space:nowrap}
 mark.pend{background:var(--hl-yellow);color:inherit;outline:1.5px dashed var(--accent);outline-offset:1px;border-radius:2px}
 #pop{position:fixed;z-index:31;width:min(380px,calc(100vw - 24px));max-height:min(52vh,460px);display:flex;flex-direction:column;background:var(--r-panel);color:var(--r-fg);border:1px solid var(--r-rule);border-radius:14px;box-shadow:0 12px 36px rgba(0,0,0,.28);animation:fade .15s;box-sizing:border-box}
+#pop[data-side]::before{content:"";position:absolute;top:calc(var(--ay,40px) - 8px);width:15px;height:15px;background:var(--r-panel);border:1px solid var(--r-rule);transform:rotate(45deg)}
+#pop[data-side="right"]::before{left:-8.5px;border-top-color:transparent;border-right-color:transparent}
+#pop[data-side="left"]::before{right:-8.5px;border-bottom-color:transparent;border-left-color:transparent}
+#pop:not([data-side])::before{display:none}
+#popBody #memoText{min-height:120px}
 #pop .pop-head{display:flex;align-items:center;gap:6px;padding:8px 8px 6px 16px;border-bottom:1px solid var(--r-rule)}
 #pop .pop-head b{flex:1;font-size:13px;font-weight:600;color:var(--r-muted)}
 #pop .pop-head button{width:32px;height:32px;border:0;background:none;color:var(--r-fg);border-radius:8px;cursor:pointer;font-size:18px;line-height:1}
@@ -1465,7 +1470,7 @@ selbar.addEventListener('click', e => {
     addAnnotation('ul', null, h.s, h.e);
     return editAnnotation(h.id);
   }
-  if (act === 'memo') { const t = h || createAnnotation('hl', 'yellow'); if (t) openSheet('memo', t); }
+  if (act === 'memo') { const rect = selbar._rect, t = h || createAnnotation('hl', 'yellow'); if (t) { hideSelbar(); hideHandles(); return openPop('memo', t, rect); } }
   else if (act === 'copy') copyText(h ? h.text : getSelection().toString());
   else if (act === 'del') { if (ctx.ul) deleteH(ctx.ul.id); if (ctx.hl) deleteH(ctx.hl.id); toast('지웠어요'); }
   else if (act === 'sentence') expandSentence();
@@ -1561,7 +1566,7 @@ stage.addEventListener('wheel', e => {
 }, { passive: false });
 document.addEventListener('keydown', e => {
   if (!R.book || reader.hidden) return;
-  if (e.target.closest('input,textarea,select')) { if (e.key === 'Escape') closeSheet(); return; }
+  if (e.target.closest('input,textarea,select')) { if (e.key === 'Escape') { if (POP.on) closePop(); else closeSheet(); } return; }
   if (!sheet.hidden) { if (e.key === 'Escape') closeSheet(); return; }
   if (POP.on && e.key === 'Escape') { closePop(); return; }
   if (R.ext && e.key === 'Escape') { cancelExtend(); return; }
@@ -1594,28 +1599,42 @@ const pop = $('#pop'), POP = { on: false, rect: null, marks: [] };
 function openPop(kind, arg, rect) {
   closeSheet();
   POP.on = true; POP.rect = rect;
-  if (arg.ch === R.ch) { // keep the looked-up words marked while the card is open
+  if (kind !== 'memo' && arg.ch === R.ch) { // keep the looked-up words marked while the card is open
     const sp = posToPoint(arg.s), ep = posToPoint(arg.e);
     if (sp && ep) POP.marks = wrapRange(sp, ep, () => Object.assign(document.createElement('mark'), { className: 'pend' }));
   }
-  $('#popTitle').textContent = kind === 'dict' ? '사전' : '번역';
+  $('#popTitle').textContent = { dict: '사전', translate: '번역', memo: '메모' }[kind];
   pop.hidden = false;
-  (kind === 'dict' ? renderDict : renderTranslate)(arg);
+  ({ dict: renderDict, translate: renderTranslate, memo: renderMemo })[kind](arg);
   placePop();
 }
 function placePop() {
   if (!POP.on || !POP.rect) return;
-  const r = POP.rect, w = pop.offsetWidth, h = pop.offsetHeight, gap = 12, m = 8;
-  const below = innerHeight - r.bottom - gap - m, above = r.top - gap - m;
-  let y = below >= h || below >= above ? r.bottom + gap : r.top - gap - h;
-  y = clamp(y, m + (parseFloat(getComputedStyle(document.documentElement).paddingTop) || 0), innerHeight - h - m);
-  const x = clamp(r.left + r.width / 2 - w / 2, m, innerWidth - w - m);
+  const r = POP.rect, gap = 14, m = 10;
+  const top0 = m + (parseFloat(getComputedStyle(document.documentElement).paddingTop) || 0);
+  const room = { right: innerWidth - r.right - gap - m, left: r.left - gap - m };
+  const side = room.right >= 300 || room.left >= 300 ? (room.right >= room.left ? 'right' : 'left') : null;
+  pop.style.width = side ? Math.min(380, room[side]) + 'px' : '';
+  const w = pop.offsetWidth, h = pop.offsetHeight;
+  let x, y;
+  if (side) { // like Apple Books: next to the passage, so it stays readable
+    x = side === 'right' ? r.right + gap : r.left - gap - w;
+    y = clamp(r.top + r.height / 2 - h / 2, top0, innerHeight - h - m);
+    pop.dataset.side = side;
+    pop.style.setProperty('--ay', clamp(r.top + Math.min(r.height, 60) / 2 - y, 18, h - 18) + 'px');
+  } else {
+    delete pop.dataset.side;
+    const below = innerHeight - r.bottom - gap - m, above = r.top - gap - m;
+    y = below >= h || below >= above ? r.bottom + gap : r.top - gap - h;
+    y = clamp(y, top0, innerHeight - h - m);
+    x = clamp(r.left + r.width / 2 - w / 2, m, innerWidth - w - m);
+  }
   Object.assign(pop.style, { left: x + 'px', top: y + 'px' });
 }
 function closePop() { if (!POP.on) return; POP.on = false; pop.hidden = true; $('#popBody').innerHTML = ''; POP.marks.forEach(unwrap); POP.marks = []; }
 new ResizeObserver(placePop).observe(pop); // results arrive later and change its height
 $('#popClose').onclick = closePop;
-addEventListener('resize', closePop);
+addEventListener('resize', () => { if (POP.on && document.activeElement?.id === 'memoText') placePop(); else closePop(); });
 
 function renderToc() {
   const toc = R.book.toc.length ? R.book.toc : R.book.chapters.map((_, i) => ({ label: `${i + 1}장`, ch: i, depth: 0 }));
@@ -1695,8 +1714,10 @@ function renderMemo(h) {
     <div class="row"><button class="btn" id="memoCancel">취소</button><button class="btn primary" id="memoSave">저장</button></div>`;
   $('#memoText').value = h.note || '';
   setTimeout(() => $('#memoText').focus(), 60);
-  $('#memoCancel').onclick = closeSheet;
-  $('#memoSave').onclick = () => { h.note = $('#memoText').value.trim(); refreshMarks(h); saveNow(); closeSheet(); toast(h.note ? '메모를 저장했어요' : '메모를 비웠어요'); };
+  const done = () => (POP.on ? closePop() : closeSheet());
+  $('#memoCancel').onclick = done;
+  $('#memoSave').onclick = () => { h.note = $('#memoText').value.trim(); refreshMarks(h); saveNow(); done(); toast(h.note ? '메모를 저장했어요' : '메모를 비웠어요'); };
+  $('#memoText').onkeydown = e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) $('#memoSave').click(); };
 }
 
 function renderSettings() {
