@@ -184,7 +184,9 @@ dialog.lib-dlg::backdrop{background:var(--scrim)}
 #content pre{white-space:pre-wrap;font-size:.85em}
 #content hr{border:0;border-top:1px solid var(--r-rule);margin:1.5em 20%}
 /* on dark pages a see-through tint turns muddy (yellow becomes brown): use a real highlighter there, with dark ink */
-#reader.darkpage{--hl-yellow:rgba(250,206,40,.86);--hl-green:rgba(112,206,140,.82);--hl-blue:rgba(122,170,255,.82);--hl-pink:rgba(255,135,172,.82);--hl-purple:rgba(182,146,255,.82);--hl-orange:rgba(255,168,88,.84);--hl-ink:#14161B}
+/* dark pages: muted by default (bright colours glare on a dark page), vivid on request */
+#reader.darkpage{--hl-yellow:rgba(214,186,90,.60);--hl-green:rgba(120,190,140,.55);--hl-blue:rgba(126,160,230,.55);--hl-pink:rgba(230,140,170,.55);--hl-purple:rgba(170,140,230,.55);--hl-orange:rgba(230,160,100,.58);--hl-ink:#121316}
+#reader.darkpage.hl-vivid{--hl-yellow:rgba(250,206,40,.86);--hl-green:rgba(112,206,140,.82);--hl-blue:rgba(122,170,255,.82);--hl-pink:rgba(255,135,172,.82);--hl-purple:rgba(182,146,255,.82);--hl-orange:rgba(255,168,88,.84);--hl-ink:#14161B}
 mark.ann.hl{color:var(--hl-ink,inherit)}
 mark.ann{color:inherit;background:transparent;border-radius:2px;cursor:pointer;-webkit-box-decoration-break:clone;box-decoration-break:clone}
 mark.hl.c-yellow{background:var(--hl-yellow)} mark.hl.c-green{background:var(--hl-green)} mark.hl.c-blue{background:var(--hl-blue)} mark.hl.c-pink{background:var(--hl-pink)} mark.hl.c-purple{background:var(--hl-purple)} mark.hl.c-orange{background:var(--hl-orange)}
@@ -494,7 +496,7 @@ const FONTS = {
 };
 const MARGINS = ['clamp(16px,4vw,32px)', 'clamp(20px,6vw,64px)', 'clamp(28px,11vw,120px)'];
 const THEMES = [['auto', '자동', 'linear-gradient(135deg,#FCFCFA 50%,#16181D 50%)'], ['paper', '종이', '#FFFFFF'], ['sepia', '세피아', '#F2E9D8'], ['night', '밤', '#0F1114']];
-const DEFAULTS = { font: 'gowun', size: 19, lh: 1.8, margin: 1, theme: 'auto', mode: 'paged', justify: true, spread: 'auto', cpm: 500, pdfFit: 'page' };
+const DEFAULTS = { font: 'gowun', size: 19, lh: 1.8, margin: 1, theme: 'auto', mode: 'paged', justify: true, spread: 'auto', cpm: 500, pdfFit: 'page', hlTone: 'soft' };
 const S = Object.assign({}, DEFAULTS, ls.get('yb-settings', {}));
 if (typeof S.spread === 'boolean') S.spread = S.spread ? 'auto' : 'never';
 const saveSettings = () => ls.set('yb-settings', S);
@@ -1893,6 +1895,7 @@ function renderSettings() {
   const seg = (k, opts) => `<div class="seg">${opts.map(([v, l]) => `<button data-set="${k}" data-val="${v}" aria-pressed="${String(S[k]) === String(v)}">${l}</button>`).join('')}</div>`;
   body().innerHTML = `
   ${R.book?.isPdf ? `<div class="field"><span class="lbl">PDF 화면 맞춤</span>${seg('pdfFit', [['page', '쪽 전체'], ['width', '폭에 맞춤']])}</div>` : ''}
+  <div class="field"><span class="lbl">어두운 화면의 하이라이트</span>${seg('hlTone', [['soft', '은은하게'], ['vivid', '선명하게']])}</div>
   <div class="field"><span class="lbl">지면 색</span><div class="seg">${THEMES.map(([v, l, bg]) => `<button class="swatch" data-set="theme" data-val="${v}" aria-pressed="${S.theme === v}"><i style="background:${bg}"></i>${l}</button>`).join('')}</div></div>
   <div class="field"><span class="lbl">글꼴</span><div class="seg">${Object.entries(FONTS).map(([k, f]) => `<button class="fontbtn" data-set="font" data-val="${k}" aria-pressed="${S.font === k}"><b style="font-family:${esc(f.stack)}">가나다</b><small>${f.name}</small></button>`).join('')}</div></div>
   <div class="field"><span class="lbl">글자 크기</span><div class="stepper"><button data-step="size" data-d="-1" aria-label="작게">가−</button><output id="sizeOut">${S.size}px</output><button data-step="size" data-d="1" aria-label="크게">가+</button></div></div>
@@ -1930,6 +1933,7 @@ function changeSetting(k, v) {
 }
 function applySettings() {
   reader.classList.toggle('touchsel', coarse);
+  reader.classList.toggle('hl-vivid', S.hlTone === 'vivid');
   setTimeout(syncThemeColor);
   reader.dataset.rt = S.theme;
   const st = reader.style;
@@ -2882,7 +2886,7 @@ function syncThemeColor() {
 }
 new MutationObserver(syncThemeColor).observe(reader, { attributes: true, attributeFilter: ['hidden', 'data-rt'] });
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => setTimeout(syncThemeColor, 50));
-const APP_VERSION = 'v8';
+const APP_VERSION = 'v9';
 $('#appVer').textContent = 'My Library ' + APP_VERSION;
 // reopen the book that was open (a reload or Android closing the app in the background lands back in it).
 // The flag is cleared first and set again once the book opens, so a missing book isn't retried forever.
