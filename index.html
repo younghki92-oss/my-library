@@ -40,7 +40,7 @@
 #reader[data-rt="night"]{ --r-bg:#0F1114; --r-fg:#B9BDC6; --r-muted:#737987; --r-rule:#24272E; --r-panel:#171A1F; --r-link:#9EAAFF; --accent:#8E9BFF; --accent-ink:#0F1114; --accent-soft:rgba(142,155,255,.16); --ribbon:#D9625F; color-scheme:dark }
 
 [hidden]{display:none!important}
-html,body{height:100%}
+html,body{height:100%;overscroll-behavior:none}
 body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--f-ui);font-size:15px;-webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent}
 button{font:inherit;color:inherit}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
@@ -161,7 +161,7 @@ dialog.lib-dlg::backdrop{background:var(--scrim)}
 #drop{position:fixed;inset:12px;border:2px dashed var(--accent);border-radius:18px;background:color-mix(in srgb,var(--bg) 88%,transparent);display:flex;align-items:center;justify-content:center;font-size:18px;color:var(--accent);z-index:50;pointer-events:none}
 
 /* ---------- reader ---------- */
-#reader{position:fixed;inset:0;background:var(--r-bg);color:var(--r-fg);overflow:hidden;--mx:clamp(20px,6vw,64px);--maxw:36em;z-index:10}
+#reader{position:fixed;inset:0;overscroll-behavior:none;background:var(--r-bg);color:var(--r-fg);overflow:hidden;--mx:clamp(20px,6vw,64px);--maxw:36em;z-index:10}
 #reader.spread{--maxw:76em}
 #stage{position:absolute;inset:0;touch-action:pan-y pinch-zoom}
 #reader.scroll #stage{touch-action:auto}
@@ -965,6 +965,7 @@ async function openBook(id) {
     try { history.pushState({ reader: 1 }, ''); } catch {}
     applySettings();
     await renderChapter(R.st.loc?.ch || 0, { block: R.st.loc?.block || 0 }, false);
+    ls.set('yb-open', id);
     requestWake(); relayWarm();
     indexBook(book);
     applyLegacy();
@@ -981,6 +982,7 @@ function cardStatus(id, text) {
 function closeReader() {
   if (!R.book) return;
   cancelExtend(); hideHandles(); closePop(); clearSel(); saveNow(); closeSheet(); hideSelbar();
+  ls.set('yb-open', null);
   R.book = null; reader.hidden = true; library.hidden = false;
   releaseWake(); renderLibrary();
 }
@@ -2880,9 +2882,11 @@ function syncThemeColor() {
 }
 new MutationObserver(syncThemeColor).observe(reader, { attributes: true, attributeFilter: ['hidden', 'data-rt'] });
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => setTimeout(syncThemeColor, 50));
-const APP_VERSION = 'v7';
+const APP_VERSION = 'v8';
 $('#appVer').textContent = 'My Library ' + APP_VERSION;
-renderLibrary();
+// reopen the book that was open (a reload or Android closing the app in the background lands back in it).
+// The flag is cleared first and set again once the book opens, so a missing book isn't retried forever.
+renderLibrary().then(() => { const o = ls.get('yb-open', null); if (o && reader.hidden) { ls.set('yb-open', null); openBook(o); } });
 syncThemeColor();
 loadGIS().catch(() => {}); // ready before the first tap, so the sign-in popup isn't blocked
 if (G.on) syncNow().then(() => { renderLibrary(); if (Date.now() - G.listAt > 5 * 60000) scanDrive(); fetchLegacy(); });

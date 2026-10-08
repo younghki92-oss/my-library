@@ -36,6 +36,7 @@ storage(IndexedDB `yeobaek`: books/files/state, 실패 시 메모리) → settin
 - 번역·사전·메모 창(`#pop`)은 **선택한 글 옆**에 화살표와 함께 뜬다(넓은 화면). 좁으면 위/아래.
 - **터치 선택은 앱이 직접 관리**(`TS.range`, `setTouchRange`, `.tsel-rect`로 칠함). 터치 기기에서는 본문 `user-select:none`이고 0.3초 길게 누르면 그 순간 낱말 선택을 확정한다. 브라우저 선택을 쓰면 안드로이드 Chrome이 자기 손잡이·메뉴를 띄우고, 오래 누르면 터치를 가져가(pointercancel) 선택이 사라졌기 때문. 선택을 읽을 때는 항상 `curRange()`/`selText()`/`clearSel()`을 쓸 것. 칠(`.tsel-rect`)은 `#reader` 안에 그린다(body에 그리면 책 화면에 가려졌음).
 - 오른쪽 클릭(맥)은 브라우저 메뉴 대신 여백 메뉴만.
+- `overscroll-behavior:none`으로 안드로이드의 당겨서 새로고침을 막는다. 열려 있던 책은 `yb-open`에 기억해, 새로고침되거나 앱이 다시 열려도 그 책으로 돌아간다.
 - 어두운 지면에서는 하이라이트를 진한 형광펜 색 + 어두운 글자(`--hl-ink`)로(`#reader.darkpage`, 실제 바탕 밝기로 판단). 반투명이면 갈색으로 보였음. `<meta name="color-scheme" content="light dark">`로 브라우저의 강제 다크를 막는다. 안드로이드 Chrome의 '사이트에 어두운 테마 적용'이 켜져 있으면 노랑이 겨자·갈색으로 보인다.
 - 서재: Apple Books식 사이드바(전체·읽는 중·다 읽음·표시한 책·PDF·나의 컬렉션). 표지를 컬렉션으로 끌어다 놓기(마우스는 바로, 터치는 길게). 표지 이미지는 `draggable=false`(브라우저 이미지 끌기가 우리 끌기를 취소했었음). PDF 표지엔 빨간 모서리 띠.
 
@@ -54,6 +55,7 @@ storage(IndexedDB `yeobaek`: books/files/state, 실패 시 메모리) → settin
 - 패널이 가려져 있으면 `requestAnimationFrame`과 canvas 그리기가 멈춘다 → 테스트에서 rAF 기다리지 말 것.
 - Drive는 `window.gapi`/`window.getToken`을 가짜로 바꿔 시험(실제 Google 계정으로 로그인하지 않는다).
 - 테스트로 만든 책·상태·파일은 끝나면 지운다.
+- 커밋 전에 페이지를 새로고침하고 콘솔 오류(SyntaxError 등)를 꼭 확인한다. 한 줄 코드 안에 `//` 주석을 넣었다가 뒤의 괄호까지 주석이 되어 앱 전체가 멈춘 적이 있다.
 
 ## 커밋
 
