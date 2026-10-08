@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-visual">
 <title>My Library</title>
 <meta name="theme-color" content="#F3F4F7" id="themeColor">
 <meta name="color-scheme" content="light dark">
@@ -314,6 +314,10 @@ mark.pend{background:var(--hl-yellow);color:inherit;outline:1.5px dashed var(--a
 /* touch: the reader does its own selection (no Android selection toolbar) */
 #reader.touchsel #content{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
 #reader.touchsel.tsel-on #content{-webkit-user-select:text;user-select:text}
+.note-mark{position:fixed;z-index:4;width:22px;height:22px;display:flex;align-items:center;justify-content:center;border:0;padding:0;border-radius:6px;background:transparent;color:var(--r-muted);cursor:pointer;opacity:.85}
+.note-mark:hover{color:var(--accent);background:color-mix(in srgb,var(--r-fg) 8%,transparent)}
+.note-mark svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+#reader.dragging .note-mark,#reader:has(#sheet:not([hidden])) .note-mark{pointer-events:none}
 .tsel-rect{position:fixed;z-index:4;background:rgba(66,133,244,.38);border-radius:2px;pointer-events:none}
 .lp-hint{position:fixed;z-index:6;background:var(--accent-soft);outline:2px solid var(--accent);border-radius:3px;pointer-events:none;animation:fade .12s}
 #pop{position:fixed;z-index:31;width:min(380px,calc(100vw - 24px));max-height:min(52vh,460px);display:flex;flex-direction:column;background:var(--r-panel);color:var(--r-fg);border:1px solid var(--r-rule);border-radius:14px;box-shadow:0 12px 36px rgba(0,0,0,.28);animation:fade .15s;box-sizing:border-box}
@@ -985,7 +989,7 @@ function closeReader() {
   if (!R.book) return;
   cancelExtend(); hideHandles(); closePop(); clearSel(); saveNow(); closeSheet(); hideSelbar();
   ls.set('yb-open', null);
-  R.book = null; reader.hidden = true; library.hidden = false;
+  R.book = null; reader.hidden = true; library.hidden = false; paintNoteMarks();
   releaseWake(); renderLibrary();
 }
 $('#backBtn').onclick = () => { if (history.state?.reader) history.back(); else closeReader(); };
@@ -1102,8 +1106,9 @@ function goPage(p, animate = true) {
   content.style.transition = animate && !reduceMotion ? 'transform .3s cubic-bezier(.2,.7,.2,1)' : 'none';
   content.style.transform = `translate3d(${-R.page * R.step}px,0,0)`;
   afterMove();
+  if (animate && !reduceMotion) setTimeout(paintNoteMarks, 320); // after the slide settles
 }
-function afterMove() { if (!R.relaying) R.anchor = currentAnchor(); if (TS.range) paintTsel(); if (R.edit) positionHandles(); updateChrome(); scheduleSave(); }
+function afterMove() { if (!R.relaying) R.anchor = currentAnchor(); if (TS.range) paintTsel(); paintNoteMarks(); if (R.edit) positionHandles(); updateChrome(); scheduleSave(); }
 async function next() {
   hideSelbar(); hideHandles(); closePop(); clearSel();
   if (R.book.isPdf) return pdfTurn(1);
@@ -1135,8 +1140,10 @@ async function prev() {
 }
 let relayT;
 function scheduleRelayout() { clearTimeout(relayT); relayT = setTimeout(relayout, 120); }
+const typing = () => !!document.activeElement?.matches?.('textarea, input[type=search], input[type=text], input:not([type])');
 function relayout() {
   if (!R.book || reader.hidden) return;
+  if (typing()) { R.relayoutLater = true; return; } // the on-screen keyboard must not move the page under a memo
   if (R.book.isPdf) { // re-draw the pages only when the space for them changed
     if (pdfSizeKey() !== R.pdfSize) renderPdf(R.ch, {}, false);
     return;
@@ -1293,11 +1300,33 @@ function createAnnotation(kind, color = 'yellow') {
   clearSel();
   return addAnnotation(kind, color, p.s, p.e);
 }
-function refreshMarks(h) { marksOf(h.id).forEach(m => { m.className = markClass(h); }); }
+function refreshMarks(h) { marksOf(h.id).forEach(m => { m.className = markClass(h); }); paintNoteMarks(); }
+// note icons sit in the page margin next to the first visible line of each annotated passage
+const NOTE_ICON = '<svg viewBox="0 0 24 24"><path d="M5 4.5h10l4 4v11H5z"/><path d="M15 4.5v4h4"/><path d="M8.5 12.5h7M8.5 15.5h5"/></svg>';
+let noteMarks = [];
+function paintNoteMarks() {
+  noteMarks.forEach(n => n.remove()); noteMarks = [];
+  if (!R.book || reader.hidden) return;
+  const pr = page.getBoundingClientRect(), mid = pr.left + pr.width / 2, spread = reader.classList.contains('spread');
+  const seen = new Set();
+  for (const h of R.st.highlights) {
+    if (!h.note || seen.has(h.id)) continue;
+    const rect = [...marksOf(h.id)].flatMap(m => [...m.getClientRects()]).find(r => r.width && r.left >= pr.left - 2 && r.right <= pr.right + 2 && r.top >= pr.top - 2 && r.bottom <= pr.bottom + 2);
+    if (!rect) continue;
+    seen.add(h.id);
+    const left = spread && rect.left + rect.width / 2 < mid; // left page of a spread: outer (left) margin
+    const b = Object.assign(document.createElement('button'), { className: 'note-mark', innerHTML: NOTE_ICON, title: h.note.slice(0, 80) });
+    b.setAttribute('aria-label', '메모 보기: ' + h.note.slice(0, 40));
+    const x = left ? pr.left - 28 : pr.right + 6;
+    Object.assign(b.style, { left: Math.max(2, Math.min(innerWidth - 24, x)) + 'px', top: rect.top + rect.height / 2 - 11 + 'px' });
+    b.onclick = e => { e.stopPropagation(); hideSelbar(); hideHandles(); clearSel(); openPop('memo', h, rect); };
+    reader.appendChild(b); noteMarks.push(b);
+  }
+}
 function deleteH(id) {
   marksOf(id).forEach(unwrap); R.st.highlights = R.st.highlights.filter(h => h.id !== id); bury(id);
   if (R.edit?.id === id) hideHandles();
-  saveNow();
+  saveNow(); paintNoteMarks();
 }
 const overlaps = (a, b) => cmpPos(a.s, b.e) < 0 && cmpPos(b.s, a.e) < 0;
 function ctxOf(h) { // the highlight and underline that share this spot
@@ -1631,6 +1660,7 @@ function wordRangeAt(x, y) {
   const r = document.createRange(); r.setStart(c.node, a); r.setEnd(c.node, b);
   return r;
 }
+document.addEventListener('focusout', () => setTimeout(() => { if (R.relayoutLater && !typing()) { R.relayoutLater = false; scheduleRelayout(); } }, 300));
 const LP = { t: 0, hint: [] };
 function lpClear() { clearTimeout(LP.t); LP.hint.forEach(h => h.remove()); LP.hint = []; }
 stage.addEventListener('contextmenu', e => {
@@ -1747,7 +1777,7 @@ function openSheet(kind, arg) {
   $('#sheetTitle').textContent = titles[kind];
   ({ toc: renderToc, search: renderSearch, notes: renderNotes, settings: renderSettings, memo: renderMemo, translate: renderTranslate, dict: renderDict })[kind](arg);
 }
-function closeSheet() { sheet.hidden = true; $('#scrim').hidden = true; sheetKind = null; }
+function closeSheet() { sheet.hidden = true; $('#scrim').hidden = true; sheetKind = null; applyPendingRemote(); paintNoteMarks(); }
 const body = () => (POP.on ? $('#popBody') : $('#sheetBody'));
 
 /* --- floating card for translation and dictionary, anchored to the selection --- */
@@ -1767,8 +1797,9 @@ function openPop(kind, arg, rect) {
 }
 function placePop() {
   if (!POP.on || !POP.rect) return;
-  const r = POP.rect, gap = 14, m = 10;
-  const top0 = m + (parseFloat(getComputedStyle(document.documentElement).paddingTop) || 0);
+  const r = POP.rect, gap = 14, m = 10, vv = window.visualViewport;
+  const innerHeight = vv ? vv.height + vv.offsetTop : window.innerHeight; // stays above an open keyboard
+  const top0 = m + (vv ? vv.offsetTop : 0) + (parseFloat(getComputedStyle(document.documentElement).paddingTop) || 0);
   const room = { right: innerWidth - r.right - gap - m, left: r.left - gap - m };
   const side = room.right >= 300 || room.left >= 300 ? (room.right >= room.left ? 'right' : 'left') : null;
   pop.style.width = side ? Math.min(380, room[side]) + 'px' : '';
@@ -1788,10 +1819,17 @@ function placePop() {
   }
   Object.assign(pop.style, { left: x + 'px', top: y + 'px' });
 }
-function closePop() { if (!POP.on) return; POP.on = false; pop.hidden = true; $('#popBody').innerHTML = ''; POP.marks.forEach(unwrap); POP.marks = []; }
+function closePop() {
+  if (!POP.on) return;
+  POP.on = false; pop.hidden = true; $('#popBody').innerHTML = ''; POP.marks.forEach(unwrap); POP.marks = [];
+  applyPendingRemote(); paintNoteMarks();
+  if (R.relayoutLater) { R.relayoutLater = false; scheduleRelayout(); } // a field removed while focused may never fire focusout
+}
+function applyPendingRemote() { const v = R.pendingRemote; if (v && R.book) { R.pendingRemote = null; setTimeout(() => applyRemoteState(v), 0); } }
 new ResizeObserver(placePop).observe(pop); // results arrive later and change its height
 $('#popClose').onclick = closePop;
 addEventListener('resize', () => { if (POP.on && document.activeElement?.id === 'memoText') placePop(); else closePop(); });
+window.visualViewport?.addEventListener('resize', () => { if (POP.on) placePop(); });
 
 function renderToc() {
   const toc = R.book.toc.length ? R.book.toc : R.book.chapters.map((_, i) => ({ label: `${i + 1}장`, ch: i, depth: 0 }));
@@ -2325,6 +2363,7 @@ async function renderPdf(ch, target = {}, animate = true) {
   R.st.highlights.filter(h => h.pdf).forEach(paintPdfMark);
   if (animate && !reduceMotion) content.animate([{ opacity: 0.4 }, { opacity: 1 }], { duration: 160, easing: 'ease-out' });
   afterMove();
+  paintNoteMarks();
   R.pdfDrawn = Promise.all(jobs); // drawing finishes in the background; callers don't wait for it
 }
 // while selecting, the end-of-content box covers the page so the selection doesn't leap to the other page
@@ -2771,10 +2810,11 @@ function syncNow() {
 }
 // another device changed the open book: take its highlights now, offer its reading position
 function applyRemoteState(v) {
+  if (POP.on || !sheet.hidden || typing()) { R.pendingRemote = v; return; } // never redraw under a memo being written
   const mine = R.st;
   const marksChanged = canon([mine.highlights, mine.bookmarks]) !== canon([v.highlights, v.bookmarks]);
   const ahead = (v.locAt || 0) > (mine.locAt || 0) && v.loc && (v.loc.ch !== mine.loc?.ch || v.loc.block !== mine.loc?.block);
-  R.st = { ...v, loc: mine.loc, locAt: mine.locAt };
+  R.st = { ...mergeBook(mine, v), loc: mine.loc, locAt: mine.locAt }; // keeps edits made here since the sync read
   if (marksChanged && !hdrag && !R.ext) renderChapter(R.ch, { block: R.anchor ?? currentAnchor() }, false);
   if (ahead) toast('다른 기기에서 읽던 곳이 있어요', { label: '그곳으로', fn: () => { R.st.loc = v.loc; R.st.locAt = v.locAt; renderChapter(v.loc.ch, { block: v.loc.block }); } });
 }
@@ -2886,7 +2926,7 @@ function syncThemeColor() {
 }
 new MutationObserver(syncThemeColor).observe(reader, { attributes: true, attributeFilter: ['hidden', 'data-rt'] });
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => setTimeout(syncThemeColor, 50));
-const APP_VERSION = 'v9';
+const APP_VERSION = 'v10';
 $('#appVer').textContent = 'My Library ' + APP_VERSION;
 // reopen the book that was open (a reload or Android closing the app in the background lands back in it).
 // The flag is cleared first and set again once the book opens, so a missing book isn't retried forever.

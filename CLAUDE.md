@@ -36,6 +36,8 @@ storage(IndexedDB `yeobaek`: books/files/state, 실패 시 메모리) → settin
 - 번역·사전·메모 창(`#pop`)은 **선택한 글 옆**에 화살표와 함께 뜬다(넓은 화면). 좁으면 위/아래.
 - **터치 선택은 앱이 직접 관리**(`TS.range`, `setTouchRange`, `.tsel-rect`로 칠함). 터치 기기에서는 본문 `user-select:none`이고 0.3초 길게 누르면 그 순간 낱말 선택을 확정한다. 브라우저 선택을 쓰면 안드로이드 Chrome이 자기 손잡이·메뉴를 띄우고, 오래 누르면 터치를 가져가(pointercancel) 선택이 사라졌기 때문. 선택을 읽을 때는 항상 `curRange()`/`selText()`/`clearSel()`을 쓸 것. 칠(`.tsel-rect`)은 `#reader` 안에 그린다(body에 그리면 책 화면에 가려졌음).
 - 오른쪽 클릭(맥)은 브라우저 메뉴 대신 여백 메뉴만.
+- 메모를 쓰는 동안: 키보드는 화면을 줄이지 않고 덮는다(viewport `interactive-widget=resizes-visual`), 입력 중엔 쪽을 다시 나누지 않는다(`typing()`, `R.relayoutLater`), 다른 기기 변경은 창을 닫은 뒤 항목별로 합친다(`R.pendingRemote`, `mergeBook`). 예전엔 키보드가 올라오면 쪽이 밀리고, 동기화가 화면을 다시 그려 쓰던 메모가 사라질 수 있었다.
+- 메모가 달린 문장 옆 여백에 메모 아이콘(`paintNoteMarks`, `.note-mark`): 두 쪽 보기의 왼쪽 쪽은 왼쪽 여백, 그 외엔 오른쪽 여백. 누르면 메모 창.
 - `overscroll-behavior:none`으로 안드로이드의 당겨서 새로고침을 막는다. 열려 있던 책은 `yb-open`에 기억해, 새로고침되거나 앱이 다시 열려도 그 책으로 돌아간다.
 - 어두운 지면에서는 하이라이트를 불투명에 가까운 색 + 어두운 글자(`--hl-ink`)로(`#reader.darkpage`, 실제 바탕 밝기로 판단). 기본은 은은한 금빛 톤, 보기 설정 '어두운 화면의 하이라이트: 선명하게'(`S.hlTone`, `.hl-vivid`)면 진한 형광펜. 진한 형광펜이 기본이었을 때 맥에서 너무 쨍하다고 했음. 반투명이면 갈색으로 보였음. `<meta name="color-scheme" content="light dark">`로 브라우저의 강제 다크를 막는다. 안드로이드 Chrome의 '사이트에 어두운 테마 적용'이 켜져 있으면 노랑이 겨자·갈색으로 보인다.
 - 서재: Apple Books식 사이드바(전체·읽는 중·다 읽음·표시한 책·PDF·나의 컬렉션). 표지를 컬렉션으로 끌어다 놓기(마우스는 바로, 터치는 길게). 표지 이미지는 `draggable=false`(브라우저 이미지 끌기가 우리 끌기를 취소했었음). PDF 표지엔 빨간 모서리 띠.
