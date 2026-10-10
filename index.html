@@ -996,6 +996,9 @@ function openFromShelf(id, e) {
     const url = new URL(location.href); url.search = '?book=' + encodeURIComponent(id); url.hash = '';
     const w = window.open(url.href, 'book-' + id, 'width=1200,height=860');
     if (w) { try { w.focus(); } catch {} return; }
+    // an installed app may hand back null although the window did open — only fall back if focus never left the shelf
+    setTimeout(() => { if (document.hasFocus() && reader.hidden) openBook(id); }, 600);
+    return;
   }
   openBook(id);
 }
@@ -2977,7 +2980,7 @@ function syncThemeColor() {
 }
 new MutationObserver(syncThemeColor).observe(reader, { attributes: true, attributeFilter: ['hidden', 'data-rt'] });
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => setTimeout(syncThemeColor, 50));
-const APP_VERSION = 'v12';
+const APP_VERSION = 'v13';
 $('#appVer').textContent = 'My Library ' + APP_VERSION;
 // reopen the book that was open (a reload or Android closing the app in the background lands back in it).
 // The flag is cleared first and set again once the book opens, so a missing book isn't retried forever.
