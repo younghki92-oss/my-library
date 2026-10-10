@@ -177,6 +177,8 @@ dialog.lib-dlg::backdrop{background:var(--scrim)}
 #content h3,#content h4{font-size:1.05em}
 #content > :first-child{margin-top:0}
 #content img,#content svg{max-width:100%;height:auto;max-height:calc(var(--page-h,80vh) * .94);object-fit:contain;display:block;margin:.6em auto;break-inside:avoid}
+#content img.inl{display:inline;height:1.15em;width:auto;max-height:none;margin:0 .05em;vertical-align:-.22em}
+#reader.darkpage #content img.inl.ink{filter:invert(1);opacity:.88}
 #content blockquote{margin:1.1em 0;padding-left:1em;border-left:2px solid var(--r-rule);color:var(--r-muted)}
 #content a{color:var(--r-link);text-decoration-thickness:1px;text-underline-offset:.18em}
 #content table{border-collapse:collapse;font-size:.9em}
@@ -1054,10 +1056,42 @@ async function renderChapter(ch, target = {}, animate = true) {
   R.blockIdx = new Map(R.blocks.map((b, i) => [b, i]));
   R.st.highlights.filter(h => h.ch === ch).forEach(applyHighlight);
   if (R.ext) paintPending();
-  $$('img', content).forEach(img => { if (!img.complete) img.addEventListener('load', scheduleRelayout, { once: true }); });
+  $$('img', content).forEach(img => {
+    markInlineImg(img);
+    if (!img.complete) img.addEventListener('load', () => { markInlineImg(img); scheduleRelayout(); }, { once: true });
+  });
   layout();
   goTarget(target);
   if (animate && !reduceMotion) content.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 200, easing: 'ease-out' });
+}
+// a small picture inside a sentence (e.g. a transliterated word set as an image) flows with the text like a letter
+const IMG_BLOCK = 'p,div,li,td,th,dd,dt,h1,h2,h3,h4,h5,h6,blockquote,figure,section,body';
+function markInlineImg(img) {
+  const blk = img.closest(IMG_BLOCK) || content;
+  const hasText = blk.textContent.replace(/\s+/g, '').length > 0 && blk.tagName !== 'FIGURE';
+  const h = img.naturalHeight || +img.getAttribute('height') || 0;
+  img.classList.toggle('inl', hasText && (!h || h <= 120));
+  if (img.classList.contains('inl') && img.complete && img.naturalWidth && !img.dataset.ink) clearPaper(img);
+}
+// dark letters on white paper → the same letters on a transparent ground, so they sit on any page colour (inverted on dark pages)
+function clearPaper(img) {
+  img.dataset.ink = '1';
+  try {
+    const w = img.naturalWidth, h = img.naturalHeight;
+    if (w * h > 400000) return;
+    const c = document.createElement('canvas'); c.width = w; c.height = h;
+    const x = c.getContext('2d'); x.drawImage(img, 0, 0);
+    const d = x.getImageData(0, 0, w, h), px = d.data;
+    const lum = i => (px[i] * 299 + px[i + 1] * 587 + px[i + 2] * 114) / 1000;
+    const corners = [0, (w - 1) * 4, (h - 1) * w * 4, (h * w - 1) * 4];
+    if (corners.some(i => px[i + 3] > 200 && lum(i) < 200)) return; // not dark-on-light paper
+    for (let i = 0; i < px.length; i += 4) {
+      const a = Math.max(0, Math.min(255, (255 - lum(i)) * 1.25)) * px[i + 3] / 255;
+      px[i] = px[i + 1] = px[i + 2] = 0; px[i + 3] = a;
+    }
+    x.putImageData(d, 0, 0);
+    c.toBlob(b => { if (b) { img.src = URL.createObjectURL(b); img.classList.add('ink'); } });
+  } catch {}
 }
 // two pages side by side: "auto" picks it for wide, near-square-or-wider screens (an unfolded Fold, a laptop window)
 function wantSpread() {
@@ -2943,7 +2977,7 @@ function syncThemeColor() {
 }
 new MutationObserver(syncThemeColor).observe(reader, { attributes: true, attributeFilter: ['hidden', 'data-rt'] });
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => setTimeout(syncThemeColor, 50));
-const APP_VERSION = 'v11';
+const APP_VERSION = 'v12';
 $('#appVer').textContent = 'My Library ' + APP_VERSION;
 // reopen the book that was open (a reload or Android closing the app in the background lands back in it).
 // The flag is cleared first and set again once the book opens, so a missing book isn't retried forever.
