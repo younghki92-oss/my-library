@@ -842,7 +842,7 @@ async function renderLibrary() {
 const LIB = { books: [], view: ls.get('yb-view', 'all'), q: '' };
 library.addEventListener('click', async e => {
   const t = e.target.closest('button'); if (!t) return;
-  if (t.dataset.open) { if (!DRAG.justDragged) openBook(t.dataset.open); }
+  if (t.dataset.open) { if (!DRAG.justDragged) openFromShelf(t.dataset.open, e); }
   else if (t.dataset.edit) openBookDialog(LIB.books.find(b => b.id === t.dataset.edit));
 });
 function openBookDialog(b) {
@@ -971,7 +971,8 @@ async function openBook(id) {
     try { history.pushState({ reader: 1 }, ''); } catch {}
     applySettings();
     await renderChapter(R.st.loc?.ch || 0, { block: R.st.loc?.block || 0 }, false);
-    ls.set('yb-open', id);
+    if (!BOOK_WIN) ls.set('yb-open', id); // book windows come back through their own address
+    if (BOOK_WIN) document.title = `${shown.title} — My Library`;
     requestWake(); relayWarm();
     indexBook(book);
     applyLegacy();
@@ -985,9 +986,25 @@ function cardStatus(id, text) {
   const card = $(`.card[data-id="${CSS.escape(id)}"]`); if (!card) return;
   card.classList.add('loading'); const ft = card.querySelector('.foot-txt'); if (ft) ft.textContent = text;
 }
+// Mac (mouse/trackpad): each book opens in its own window, named after the book so a second click
+// brings that window forward. Touch devices keep the same window. Cmd/Ctrl-click always opens a window.
+const BOOK_WIN = new URLSearchParams(location.search).get('book'); // this window was opened for one book
+function openFromShelf(id, e) {
+  if (!coarse || e?.metaKey || e?.ctrlKey) {
+    const url = new URL(location.href); url.search = '?book=' + encodeURIComponent(id); url.hash = '';
+    const w = window.open(url.href, 'book-' + id, 'width=1200,height=860');
+    if (w) { try { w.focus(); } catch {} return; }
+  }
+  openBook(id);
+}
 function closeReader() {
   if (!R.book) return;
   cancelExtend(); hideHandles(); closePop(); clearSel(); saveNow(); closeSheet(); hideSelbar();
+  if (BOOK_WIN) { // a book window closes; the shelf window stays where it was
+    window.close();
+    setTimeout(() => { location.href = location.pathname; }, 150); // if the browser won't close it (e.g. after a reload), show the shelf
+    return;
+  }
   ls.set('yb-open', null);
   R.book = null; reader.hidden = true; library.hidden = false; paintNoteMarks();
   releaseWake(); renderLibrary();
@@ -2926,11 +2943,16 @@ function syncThemeColor() {
 }
 new MutationObserver(syncThemeColor).observe(reader, { attributes: true, attributeFilter: ['hidden', 'data-rt'] });
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => setTimeout(syncThemeColor, 50));
-const APP_VERSION = 'v10';
+const APP_VERSION = 'v11';
 $('#appVer').textContent = 'My Library ' + APP_VERSION;
 // reopen the book that was open (a reload or Android closing the app in the background lands back in it).
 // The flag is cleared first and set again once the book opens, so a missing book isn't retried forever.
-renderLibrary().then(() => { const o = ls.get('yb-open', null); if (o && reader.hidden) { ls.set('yb-open', null); openBook(o); } });
+renderLibrary().then(() => {
+  if (BOOK_WIN) return openBook(BOOK_WIN);
+  const o = ls.get('yb-open', null); if (o && reader.hidden) { ls.set('yb-open', null); openBook(o); }
+});
+// the shelf shows fresh progress when you come back to it from a book window
+addEventListener('focus', () => { if (reader.hidden && !BOOK_WIN) renderLibrary(); });
 syncThemeColor();
 loadGIS().catch(() => {}); // ready before the first tap, so the sign-in popup isn't blocked
 if (G.on) syncNow().then(() => { renderLibrary(); if (Date.now() - G.listAt > 5 * 60000) scanDrive(); fetchLegacy(); });
