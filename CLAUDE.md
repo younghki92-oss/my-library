@@ -31,6 +31,7 @@ storage(IndexedDB `yeobaek`: books/files/state, 실패 시 메모리) → settin
 - 하이라이트 종류: `kind:'hl'`(노랑·색 고르기 5색) / `kind:'ul'`(빨간 밑줄, 하이라이트 위에 겹침). 메모는 `note`.
 - **동기화**: Drive 앱 전용 폴더(appDataFolder)의 `yeobaek-state.json` 하나. 책별로 항목 ID + 수정 시각(`mt`, `stampItems`)으로 병합, 지운 항목은 `tomb`에 기록해 되살아나지 않게. 읽은 위치는 `locAt`이 최신인 쪽. 컬렉션은 `cols`(전체를 최신 `at`으로). Drive 책 ID는 `d:<파일ID>`.
 - Google 로그인: 예전 '서재' 앱과 **같은 OAuth 클라이언트 ID**(코드의 `DEFAULT_CID`), 같은 책 폴더(`DEFAULT_FID`). 그래서 예전 앱의 `seojae-state.json`을 읽어 하이라이트를 옮길 수 있다(`applyLegacy`, 한 번만).
+- **로그인 갱신은 사용자가 누를 때만**: Google 토큰은 1시간이면 끝나고, GIS 토큰 클라이언트는 `prompt:'none'`이어도 로그인 창(팝업)을 띄워야 갱신된다. 예전엔 동기화(1분마다·화면 전환마다)가 만료 뒤 스스로 갱신을 시도해 로그인 창이 몇 분마다 튀어나왔고, 닫으면 다음 동기화가 또 띄웠다. 책 창마다 토큰을 따로 들고 있어 더 자주 떴다. 지금은 `getToken(false)`가 창을 띄우지 않고 `login_needed`를 던지며 화면 아래 '다시 연결' 알림(`#relogin`)을 보여 준다. 토큰은 localStorage `yb-g-tok`로 창끼리 나눠 쓴다(`storage` 이벤트). 만료돼도 기기에 받아 둔 책은 열린다.
 - **사전**: 사용자의 Apps Script 중계(`DEFAULT_RELAY`) → 표준국어대사전(`src=stdict`)·Merriam-Webster(`mw`, `mwth`). 없으면 위키낱말사전. 결과는 출처별로 도착하는 대로 표시하고 기기에 캐시(`yb-lk`).
 - **번역**: Chrome 내장 Translator(기기 안) → 중계 `src=tr`(Apps Script `LanguageApp`, 사용자가 아직 안 붙였을 수 있음, 하루 한 번 지원 여부 확인) → MyMemory. 기본 방향은 **영어→한국어, 한국어→영어** 고정, 프랑스어는 그때그때 선택.
 - 번역·사전·메모 창(`#pop`)은 **선택한 글 옆**에 화살표와 함께 뜬다(넓은 화면). 좁으면 위/아래.

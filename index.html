@@ -362,7 +362,12 @@ mark.pend{background:var(--hl-yellow);color:inherit;outline:1.5px dashed var(--a
 .dict-defs{margin:0;padding-left:1.3em;font-size:15px;line-height:1.65}
 .dict-defs li{margin:.25em 0}
 .dict-defs small{display:block;color:var(--r-muted);font-family:var(--r-font);font-size:13.5px}
-#toast{position:fixed;#toast{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 28px);transform:translate(-50%,20px);opacity:0;background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:10px;font-size:14px;z-index:60;transition:all .25s;pointer-events:none;max-width:calc(100% - 32px);text-align:center}
+#relogin{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 74px);transform:translateX(-50%);z-index:59;display:flex;align-items:center;gap:10px;max-width:calc(100vw - 32px);padding:8px 8px 8px 14px;border-radius:12px;background:var(--ink);color:var(--bg);font-size:13.5px;box-shadow:0 6px 24px rgba(0,0,0,.25)}
+#relogin[hidden]{display:none}
+#relogin button{border:0;border-radius:8px;padding:6px 11px;font:inherit;cursor:pointer}
+#reloginBtn{background:var(--accent);color:#fff;font-weight:600}
+#reloginX{background:transparent;color:inherit;opacity:.7;padding:6px 8px}
+#toast{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 28px);transform:translate(-50%,20px);opacity:0;background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:10px;font-size:14px;z-index:60;transition:all .25s;pointer-events:none;max-width:calc(100% - 32px);text-align:center}
 #toast.show{opacity:1;transform:translate(-50%,0)}
 @media (prefers-reduced-motion: reduce){ *,*::before,*::after{animation:none!important;transition:none!important} }
 </style>
@@ -440,6 +445,7 @@ mark.pend{background:var(--hl-yellow);color:inherit;outline:1.5px dashed var(--a
   <div id="extbar" hidden><span id="extHint"></span><button id="extNext">다음 쪽 ›</button><button id="extCancel">취소</button></div>
 </section>
 <div id="toast" role="status" aria-live="polite"></div>
+<div id="relogin" role="status" hidden><span>Google 로그인이 만료돼 동기화를 멈췄어요</span><button type="button" id="reloginBtn">다시 연결</button><button type="button" id="reloginX" aria-label="닫기">✕</button></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script>
@@ -940,8 +946,13 @@ async function openBook(id) {
       const m = (await store.get('books', id)) || { id, source: 'drive' };
       let buf = await store.get('files', id);
       if (f && (!buf || m.cachedMt !== f.modifiedTime)) {
-        buf = await driveDownload(f, pct => cardStatus(id, `받는 중 ${Math.round(pct * 100)}%`));
-        await store.put('files', id, buf); m.cachedMt = f.modifiedTime;
+        try {
+          buf = await driveDownload(f, pct => cardStatus(id, `받는 중 ${Math.round(pct * 100)}%`));
+          await store.put('files', id, buf); m.cachedMt = f.modifiedTime;
+        } catch (e) {
+          if (e.message !== 'login_needed') throw e;
+          if (!buf) throw new Error("Google 로그인이 만료됐어요. '다시 연결'을 누른 뒤 다시 열어 주세요."); // an older copy here still opens
+        }
       }
       if (!buf) return toast('Drive에 연결한 뒤 다시 열어 주세요');
       const name = f?.name || m.name || '';
@@ -980,7 +991,8 @@ async function openBook(id) {
     applyLegacy();
   } catch (err) {
     console.error(err);
-    toast(isDrive(id) && /fetch|download|401|403|token|popup/i.test(err.message || '') ? 'Drive에서 책을 받지 못했어요. 연결 상태를 확인해 주세요.' : '책을 여는 중 문제가 생겼어요: ' + (err.message || err));
+    if (/^Google 로그인/.test(err.message || '')) toast(err.message);
+    else toast(isDrive(id) && /fetch|download|401|403|token|popup/i.test(err.message || '') ? 'Drive에서 책을 받지 못했어요. 연결 상태를 확인해 주세요.' : '책을 여는 중 문제가 생겼어요: ' + (err.message || err));
     renderLibrary();
   } finally { openBook.busy = false; }
 }
@@ -2720,24 +2732,42 @@ function loadGIS() {
     document.head.appendChild(sc);
   }));
 }
+// Google's token client can only renew through a sign-in window, so a renewal starts only from the user's own tap.
+// Background syncs never open it: an expired token (about once an hour) waits for the reconnect notice instead.
+const tokOk = t => t && Date.now() < t.exp - 60000;
 async function getToken(interactive) {
-  if (G.token && Date.now() < G.token.exp - 60000) return G.token.v;
+  if (!tokOk(G.token)) { const t = ls.get('yb-g-tok', null); if (tokOk(t)) G.token = t; } // renewed in another window
+  if (tokOk(G.token)) return G.token.v;
+  if (!interactive) { showRelogin(); throw new Error('login_needed'); }
   await loadGIS();
   return new Promise((res, rej) => {
     if (!G.client) G.client = google.accounts.oauth2.initTokenClient({ client_id: G.cid, scope: SCOPES, callback: () => {}, error_callback: e => G.onErr?.(e) });
     G.client.callback = r => {
       if (r.error) return rej(new Error(r.error));
       G.token = { v: r.access_token, exp: Date.now() + (r.expires_in || 3600) * 1000 };
-      ls.set('yb-g-tok', G.token); res(G.token.v);
+      ls.set('yb-g-tok', G.token); hideRelogin(); res(G.token.v);
     };
     G.onErr = e => rej(new Error(e?.type || 'popup_failed'));
     try { G.client.requestAccessToken({ prompt: interactive ? '' : 'none' }); } catch (e) { rej(e); }
   });
 }
+function showRelogin() { if (G.on && !G.reloginX) $('#relogin').hidden = false; }
+function hideRelogin() { $('#relogin').hidden = true; G.reloginX = false; }
+$('#reloginBtn').onclick = async () => {
+  try { await getToken(true); hideRelogin(); G.err = null; await syncNow(); if (reader.hidden) renderLibrary(); toast('다시 연결했어요'); }
+  catch (e) { toast(/popup|closed/i.test(e.message) ? '로그인 창이 닫혔어요. 다시 눌러 주세요.' : '연결하지 못했어요: ' + e.message); }
+};
+$('#reloginX').onclick = () => { $('#relogin').hidden = true; G.reloginX = true; }; // until the next sign-in; the Drive button still shows 다시 연결
+// a sign-in in one window (shelf or a book window) serves all of them
+addEventListener('storage', e => {
+  if (e.key !== 'yb-g-tok') return;
+  const t = ls.get('yb-g-tok', null);
+  if (tokOk(t)) { G.token = t; const was = !$('#relogin').hidden || G.err; hideRelogin(); if (was) { G.err = null; syncNow(); } }
+});
 async function gapi(url, opts = {}) {
   const call = tk => fetch(url, { ...opts, headers: { ...(opts.headers || {}), Authorization: 'Bearer ' + tk } });
   let r = await call(await getToken(false));
-  if (r.status === 401) { G.token = null; r = await call(await getToken(false)); }
+  if (r.status === 401) { G.token = null; ls.set('yb-g-tok', null); r = await call(await getToken(false)); }
   return r;
 }
 async function connectDrive() {
@@ -2753,7 +2783,7 @@ async function connectDrive() {
 }
 function disconnectDrive() {
   try { if (G.token) google.accounts.oauth2.revoke(G.token.v); } catch {}
-  Object.assign(G, { on: false, token: null, err: null });
+  Object.assign(G, { on: false, token: null, err: null }); hideRelogin();
   ls.set('yb-g-on', false); ls.set('yb-g-tok', null);
   toast('Drive 연결을 해제했어요'); renderLibrary();
 }
@@ -2779,7 +2809,7 @@ async function scanDrive() {
     }
     G.list = found; G.listAt = Date.now(); G.err = null;
     ls.set('yb-drive-list', { files: found, at: G.listAt });
-  } catch (e) { console.warn(e); G.err = e; toast(e.message); }
+  } catch (e) { console.warn(e); G.err = e; if (e.message !== 'login_needed') toast(e.message); }
   finally { G.scanning = false; if (reader.hidden) renderLibrary(); else updateDriveChip(); }
 }
 async function driveDownload(f, onPct) {
@@ -2884,7 +2914,7 @@ function updateDriveChip() {
   t.textContent = m == null ? 'Drive 연결됨' : m < 1 ? '방금 맞춤' : m < 60 ? `${m}분 전 맞춤` : 'Drive 연결됨';
 }
 $('#driveBtn').onclick = () => {
-  if (!G.on || (G.err && /token|popup|401|interaction|consent|access_denied/i.test(G.err.message))) return connectDrive();
+  if (!G.on || (G.err && /token|popup|401|interaction|consent|access_denied|login_needed/i.test(G.err.message))) return connectDrive();
   openDriveDialog();
 };
 function openDriveDialog() {
@@ -2981,7 +3011,7 @@ function syncThemeColor() {
 }
 new MutationObserver(syncThemeColor).observe(reader, { attributes: true, attributeFilter: ['hidden', 'data-rt'] });
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => setTimeout(syncThemeColor, 50));
-const APP_VERSION = 'v14';
+const APP_VERSION = 'v15';
 $('#appVer').textContent = 'My Library ' + APP_VERSION;
 // reopen the book that was open (a reload or Android closing the app in the background lands back in it).
 // The flag is cleared first and set again once the book opens, so a missing book isn't retried forever.
