@@ -111,6 +111,27 @@ svg.i{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.7;stro
 .shelf-head{display:flex;align-items:baseline;gap:10px;margin-bottom:16px}
 .shelf-head h2{margin:0;font-size:15px;font-weight:600}
 .shelf-head span{color:var(--muted);font-size:13px}
+#grid.an-mode{display:block;max-width:780px}
+.an-filters{display:flex;gap:6px;flex-wrap:wrap}
+.an-chip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font:inherit;font-size:13px;padding:5px 11px;border-radius:999px;cursor:pointer}
+.an-chip[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.an-chip i{width:10px;height:10px;border-radius:50%;display:inline-block}
+.an-book{margin-bottom:34px}
+.an-head{display:flex;gap:12px;align-items:center;margin:0 0 12px;background:none;border:0;cursor:pointer;color:inherit;text-align:left;padding:0;font:inherit}
+.an-head .cover{width:40px;flex:none}
+.an-head h3{margin:0;font-size:16px;line-height:1.35}
+.an-head .sub{font-size:12.5px;color:var(--muted)}
+.an-item{display:flex;gap:12px;width:100%;text-align:left;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:8px;cursor:pointer;color:var(--ink);font:inherit}
+.an-item:hover{border-color:color-mix(in srgb,var(--accent) 55%,var(--line))}
+.an-item .sw{width:4px;border-radius:2px;flex:none;align-self:stretch}
+.an-item .bd{min-width:0;flex:1}
+.an-item .q{font-family:var(--serif,inherit);font-size:15px;line-height:1.65;display:-webkit-box;-webkit-line-clamp:5;-webkit-box-orient:vertical;overflow:hidden}
+.an-item .q.ul{text-decoration:underline;text-decoration-color:#E5484D;text-underline-offset:3px}
+.an-item .n{margin-top:8px;font-size:14px;line-height:1.6;padding:8px 11px;border-radius:8px;background:color-mix(in srgb,var(--ink) 6%,transparent);white-space:pre-wrap}
+.an-item .m{margin-top:7px;font-size:12px;color:var(--muted)}
+.an-item mark{background:var(--accent-soft);color:inherit;border-radius:2px}
+mark.hl-pulse,.hl-pulse{animation:hlPulse 1.4s ease-out 2}
+@keyframes hlPulse{0%,100%{box-shadow:0 0 0 0 transparent}40%{box-shadow:0 0 0 4px color-mix(in srgb,var(--accent) 55%,transparent)}}
 #grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:34px 26px}
 @media (max-width:520px){ #grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:22px 14px} .continue{gap:14px;padding:14px} .continue .cover{width:70px} }
 .card{position:relative;min-width:0;display:flex;flex-direction:column;gap:8px}
@@ -383,6 +404,7 @@ mark.pend{background:var(--hl-yellow);color:inherit;outline:1.5px dashed var(--a
     <button class="side-item" data-view="reading"><svg viewBox="0 0 24 24"><path d="M3 5.5c3-1 6-1 9 1 3-2 6-2 9-1v13c-3-1-6-1-9 1-3-2-6-2-9-1z"/><path d="M12 6.5v13"/></svg><span class="lbl">읽는 중</span><span class="n" id="nReading"></span></button>
     <button class="side-item" data-view="done"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M8 12.3l2.7 2.7L16 9.6"/></svg><span class="lbl">다 읽음</span><span class="n" id="nDone"></span></button>
     <button class="side-item" data-view="marked"><svg viewBox="0 0 24 24"><path d="M5 19.5h14"/><path d="M14.5 4.5l4 4L9 18H5v-4z"/></svg><span class="lbl">표시한 책</span><span class="n" id="nMarked"></span></button>
+    <button class="side-item" data-view="notes"><svg viewBox="0 0 24 24"><path d="M6 4.5h12v15l-6-3.6-6 3.6z"/><path d="M9 9h6M9 12h4"/></svg><span class="lbl">하이라이트 · 메모</span><span class="n" id="nNotes"></span></button>
     <button class="side-item" data-view="pdf"><svg viewBox="0 0 24 24"><path d="M7 3.5h7l4 4v13H7z"/><path d="M14 3.5v4h4"/><path d="M9.5 13h5M9.5 16h5"/></svg><span class="lbl">PDF</span><span class="n" id="nPdf"></span></button>
     <p class="side-h">나의 컬렉션</p>
     <div id="colList"></div>
@@ -804,14 +826,18 @@ async function renderLibrary() {
     done: b => prog(b.id) >= 0.98,
     marked: b => { const c = MK.get(b.id); return !b.sample && c && c.hl + c.memo + c.bm > 0; },
     pdf: b => b.format === 'pdf',
+    hlCount: id => (states.get(id)?.highlights || []).length,
   };
   const col = LIB.view.startsWith('col:') ? COLS.list.find(c => 'col:' + c.id === LIB.view) : null;
   if (LIB.view.startsWith('col:') && !col) LIB.view = 'all';
   renderSide(all, inView);
   const q = LIB.q.trim().toLowerCase();
+  $('#libQ').placeholder = LIB.view === 'notes' ? '하이라이트, 메모 검색' : '제목, 저자 검색';
+  $('#grid').classList.toggle('an-mode', LIB.view === 'notes');
+  if (LIB.view === 'notes') { renderAllNotes(all.filter(b => !b.sample), states, q); updateDriveChip(); return; }
   let books = all.filter(col ? b => col.books.includes(b.id) : inView[LIB.view]);
   if (q) books = books.filter(b => (b.title + ' ' + (b.author || '') + ' ' + (b.file?.name || '')).toLowerCase().includes(q));
-  $('#viewTitle').textContent = col ? col.name : { all: '전체', reading: '읽는 중', done: '다 읽음', marked: '표시한 책', pdf: 'PDF' }[LIB.view];
+  $('#viewTitle').textContent = col ? col.name : { all: '전체', reading: '읽는 중', done: '다 읽음', marked: '표시한 책', pdf: 'PDF' }[LIB.view] || '전체';
   $('#viewActs').innerHTML = col ? '<button class="btn" data-colact="rename">이름 바꾸기</button><button class="btn" data-colact="delete">삭제</button>' : '';
   books.sort((a, b) => (states.get(b.id)?.lastOpened || 0) - (states.get(a.id)?.lastOpened || 0) || (b.addedAt || 0) - (a.addedAt || 0));
   const pctOf = id => Math.round((states.get(id)?.progress || 0) * 100);
@@ -847,10 +873,60 @@ async function renderLibrary() {
   updateDriveChip();
   LIB.books = books;
 }
-const LIB = { books: [], view: ls.get('yb-view', 'all'), q: '' };
+const LIB = { books: [], view: ls.get('yb-view', 'all'), q: '', nf: 'all' };
+const HL_SW = { yellow: '#F5C22E', green: '#4FB86C', blue: '#4E8BF5', pink: '#F0628E', purple: '#9B6BF0', orange: '#F2913A', red: '#E5484D' };
+const HL_NAME = { yellow: '노랑', green: '초록', blue: '파랑', pink: '분홍', purple: '보라', orange: '주황', red: '밑줄' };
+const hlColorKey = h => h.kind === 'ul' ? 'red' : h.color || 'yellow';
+const hlPosCmp = (a, b) => a.ch - b.ch || (a.s?.b ?? a.rects?.[0]?.y ?? 0) - (b.s?.b ?? b.rects?.[0]?.y ?? 0) || (a.s?.o ?? 0) - (b.s?.o ?? 0);
+function fmtDay(t) {
+  if (!t) return '';
+  const d = new Date(t), now = new Date();
+  return d.toLocaleDateString('ko-KR', d.getFullYear() === now.getFullYear() ? { month: 'long', day: 'numeric' } : { year: 'numeric', month: 'long', day: 'numeric' });
+}
+// every book's highlights and notes in one place, grouped by book (most recently marked first)
+function renderAllNotes(books, states, q) {
+  const groups = books.map(b => ({ b, hs: (states.get(b.id)?.highlights || []).filter(h => h.text) })).filter(g => g.hs.length);
+  const total = groups.reduce((n, g) => n + g.hs.length, 0);
+  const used = new Set(groups.flatMap(g => g.hs.map(hlColorKey)));
+  if (LIB.nf !== 'all' && LIB.nf !== 'memo' && !used.has(LIB.nf)) LIB.nf = 'all';
+  const keepC = h => LIB.nf === 'all' || (LIB.nf === 'memo' ? !!h.note : hlColorKey(h) === LIB.nf);
+  const hit = t => {
+    const e = esc(t); if (!q) return e;
+    const re = new RegExp(esc(q).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+    return e.replace(re, m => `<mark>${m}</mark>`);
+  };
+  // the search box matches the passage, the note, or the book's title
+  const shown = groups.map(g => {
+    const byTitle = q && (g.b.title + ' ' + (g.b.author || '')).toLowerCase().includes(q);
+    return { ...g, hs: g.hs.filter(h => keepC(h) && (!q || byTitle || (h.text + ' ' + (h.note || '')).toLowerCase().includes(q))) };
+  }).filter(g => g.hs.length)
+    .sort((x, y) => Math.max(...y.hs.map(h => h.mt || h.at || 0)) - Math.max(...x.hs.map(h => h.mt || h.at || 0)));
+  const n = shown.reduce((k, g) => k + g.hs.length, 0);
+  $('#viewTitle').textContent = '하이라이트 · 메모';
+  $('#count').textContent = n === total ? `${total}개` : `${n} / ${total}개`;
+  const chip = (k, label, dot) => `<button class="an-chip" data-nf="${k}" aria-pressed="${LIB.nf === k}">${dot ? `<i style="background:${dot}"></i>` : ''}${label}</button>`;
+  $('#viewActs').innerHTML = total ? `<div class="an-filters">${chip('all', '전체')}${chip('memo', '메모만')}${Object.keys(HL_SW).filter(k => used.has(k)).map(k => chip(k, HL_NAME[k], HL_SW[k])).join('')}</div>` : '';
+  $('#continue').innerHTML = '';
+  $('#grid').innerHTML = shown.map(({ b, hs }) => `<section class="an-book">
+      <button class="an-head" data-open="${esc(b.id)}" aria-label="${esc(b.title)} 열기">${coverHTML(b)}<div><h3>${esc(b.title)}</h3><div class="sub">${esc(b.author || '')}${b.author ? ' · ' : ''}${hs.length}개</div></div></button>
+      ${[...hs].sort(hlPosCmp).map(h => `<button class="an-item" data-go-book="${esc(b.id)}" data-go-h="${esc(h.id)}">
+        <span class="sw" style="background:${HL_SW[hlColorKey(h)]}"></span>
+        <div class="bd"><div class="q${h.kind === 'ul' ? ' ul' : ''}">${hit(h.text)}</div>
+        ${h.note ? `<div class="n">${hit(h.note)}</div>` : ''}
+        <div class="m">${b.format === 'pdf' ? `${h.ch + 1}쪽 · ` : ''}${fmtDay(h.mt || h.at)}</div></div></button>`).join('')}
+    </section>`).join('')
+    || `<p class="empty">${total ? (q ? `‘${esc(LIB.q)}’와(과) 맞는 하이라이트가 없어요.` : '이 조건에 맞는 하이라이트가 없어요.') : '아직 하이라이트나 메모가 없어요.<br>책에서 문장을 선택해 색을 칠하거나 메모를 달면, 모든 책의 것이 여기에 모여요.'}</p>`;
+  $('#libHint').innerHTML = '';
+  LIB.books = books;
+}
+$('#viewActs').addEventListener('click', e => {
+  const c = e.target.closest('[data-nf]'); if (!c) return;
+  LIB.nf = c.dataset.nf; renderLibrary();
+});
 library.addEventListener('click', async e => {
   const t = e.target.closest('button'); if (!t) return;
   if (t.dataset.open) { if (!DRAG.justDragged) openFromShelf(t.dataset.open, e); }
+  else if (t.dataset.goBook) openFromShelf(t.dataset.goBook, e, t.dataset.goH);
   else if (t.dataset.edit) openBookDialog(LIB.books.find(b => b.id === t.dataset.edit));
 });
 function openBookDialog(b) {
@@ -935,7 +1011,7 @@ const stage = $('#stage'), page = $('#page'), content = $('#content'), sheet = $
 const sentinel = Object.assign(document.createElement('span'), { id: 'sentinel' });
 const R = { edit: null, ext: null, book: null, id: null, ch: 0, page: 0, pages: 1, step: 0, blocks: [], blockIdx: new Map(), st: null, lens: null, texts: null, total: 0, seeking: false };
 
-async function openBook(id) {
+async function openBook(id, hid) {
   if (openBook.busy) return;
   openBook.busy = true;
   try {
@@ -983,7 +1059,9 @@ async function openBook(id) {
     library.hidden = true; reader.hidden = false; reader.classList.remove('ui-hidden');
     try { history.pushState({ reader: 1 }, ''); } catch {}
     applySettings();
-    await renderChapter(R.st.loc?.ch || 0, { block: R.st.loc?.block || 0 }, false);
+    const goH = hid && R.st.highlights.find(h => h.id === hid);
+    await renderChapter(goH ? goH.ch : R.st.loc?.ch || 0, { block: goH ? goH.s?.b || 0 : R.st.loc?.block || 0 }, false);
+    if (goH) showHighlight(goH);
     if (!BOOK_WIN) ls.set('yb-open', id); // book windows come back through their own address
     if (BOOK_WIN) document.title = `${shown.title} — My Library`;
     requestWake(); relayWarm();
@@ -996,6 +1074,13 @@ async function openBook(id) {
     renderLibrary();
   } finally { openBook.busy = false; }
 }
+// bring a highlight into view and make it pulse briefly
+function showHighlight(h) {
+  const ms = [...marksOf(h.id)];
+  if (ms[0] && S.mode === 'paged' && !R.book.isPdf) goPage(pageOfEl(ms[0]), false);
+  else ms[0]?.scrollIntoView?.({ block: 'center' });
+  ms.forEach(m => { m.classList.remove('hl-pulse'); void m.offsetWidth; m.classList.add('hl-pulse'); setTimeout(() => m.classList.remove('hl-pulse'), 3000); });
+}
 function cardStatus(id, text) {
   const card = $(`.card[data-id="${CSS.escape(id)}"]`); if (!card) return;
   card.classList.add('loading'); const ft = card.querySelector('.foot-txt'); if (ft) ft.textContent = text;
@@ -1003,17 +1088,17 @@ function cardStatus(id, text) {
 // Mac (mouse/trackpad): each book opens in its own window, named after the book so a second click
 // brings that window forward. Touch devices keep the same window. Cmd/Ctrl-click always opens a window.
 const BOOK_WIN = new URLSearchParams(location.search).get('book'); // this window was opened for one book
-function openFromShelf(id, e) {
+function openFromShelf(id, e, hid) {
   const android = /Android/i.test(navigator.userAgent); // the Fold always reads in the same window
   if (!android && (!coarse || e?.metaKey || e?.ctrlKey)) {
-    const url = new URL(location.href); url.search = '?book=' + encodeURIComponent(id); url.hash = '';
+    const url = new URL(location.href); url.search = '?book=' + encodeURIComponent(id) + (hid ? '&h=' + encodeURIComponent(hid) : ''); url.hash = '';
     const w = window.open(url.href, 'book-' + id, 'width=1200,height=860');
     if (w) { try { w.focus(); } catch {} return; }
     // an installed app may hand back null although the window did open — only fall back if focus never left the shelf
-    setTimeout(() => { if (document.hasFocus() && reader.hidden) openBook(id); }, 600);
+    setTimeout(() => { if (document.hasFocus() && reader.hidden) openBook(id, hid); }, 600);
     return;
   }
-  openBook(id);
+  openBook(id, hid);
 }
 function closeReader() {
   if (!R.book) return;
@@ -1950,8 +2035,7 @@ function renderNotes() {
   const all = [...R.st.highlights].sort((a, b) => a.ch - b.ch || a.s.b - b.s.b || a.s.o - b.s.o);
   const hs = all.filter(h => !h.note), ms = all.filter(h => h.note);
   const bms = [...R.st.bookmarks].sort((a, b) => a.ch - b.ch || a.b - b.b);
-  const sw = { yellow: '#F5C22E', green: '#4FB86C', blue: '#4E8BF5', pink: '#F0628E', purple: '#9B6BF0', orange: '#F2913A', red: '#E5484D' };
-  const color = h => sw[h.kind === 'ul' ? 'red' : h.color];
+  const color = h => HL_SW[hlColorKey(h)];
   const lists = {
     hl: hs.length ? hs.map(h => `<div class="note-item"><span class="sw" style="background:${color(h)}"></span><div class="body">
         <button class="q" data-go-h="${h.id}">${esc(h.text)}</button>
@@ -2601,6 +2685,7 @@ function renderSide(all, inView) {
   $('#nReading').textContent = all.filter(inView.reading).length || '';
   $('#nDone').textContent = all.filter(inView.done).length || '';
   $('#nMarked').textContent = all.filter(inView.marked).length || '';
+  $('#nNotes').textContent = all.filter(b => !b.sample).reduce((n, b) => n + (inView.hlCount?.(b.id) || 0), 0) || '';
   $('#nPdf').textContent = all.filter(inView.pdf).length || '';
   const ids = new Set(all.map(b => b.id));
   $('#colList').innerHTML = COLS.list.map(c => `<button class="side-item" data-view="col:${esc(c.id)}" data-col="${esc(c.id)}">${COL_ICON}<span class="lbl">${esc(c.name)}</span><span class="n">${c.books.filter(x => ids.has(x)).length || ''}</span></button>`).join('');
@@ -3011,12 +3096,16 @@ function syncThemeColor() {
 }
 new MutationObserver(syncThemeColor).observe(reader, { attributes: true, attributeFilter: ['hidden', 'data-rt'] });
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => setTimeout(syncThemeColor, 50));
-const APP_VERSION = 'v15';
+const APP_VERSION = 'v16';
 $('#appVer').textContent = 'My Library ' + APP_VERSION;
 // reopen the book that was open (a reload or Android closing the app in the background lands back in it).
 // The flag is cleared first and set again once the book opens, so a missing book isn't retried forever.
 renderLibrary().then(() => {
-  if (BOOK_WIN) return openBook(BOOK_WIN);
+  if (BOOK_WIN) {
+    const hid = new URLSearchParams(location.search).get('h');
+    if (hid) try { history.replaceState(history.state, '', '?book=' + encodeURIComponent(BOOK_WIN)); } catch {} // a reload resumes reading, not the jump
+    return openBook(BOOK_WIN, hid);
+  }
   const o = ls.get('yb-open', null); if (o && reader.hidden) { ls.set('yb-open', null); openBook(o); }
 });
 // the shelf shows fresh progress when you come back to it from a book window
