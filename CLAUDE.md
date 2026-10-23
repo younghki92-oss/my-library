@@ -18,7 +18,7 @@ Google Drive 폴더의 EPUB·PDF·TXT를 **맥북(Chrome)과 갤럭시 폴드(Ch
 | `icon-*.png` | 앱 아이콘(도서관 아치 서가, PIL로 그림) |
 | `.claude/launch.json` | 로컬 미리보기 서버 설정(git에서 제외) |
 
-로컬 실행: `python3 -m http.server 8766` → http://localhost:8766/
+로컬 실행: `python3 -m http.server 8766` → http://localhost:8766/ (macOS가 미리보기 서버의 '다운로드' 폴더 접근을 막으면, 파일을 scratchpad에 복사해 거기서 띄워 시험)
 
 ## index.html 구조 (섹션 주석 `/* ===== … ===== */` 기준)
 
@@ -40,8 +40,8 @@ storage(IndexedDB `yeobaek`: books/files/state, 실패 시 메모리) → settin
 - 메모를 쓰는 동안: 키보드는 화면을 줄이지 않고 덮는다(viewport `interactive-widget=resizes-visual`), 입력 중엔 쪽을 다시 나누지 않는다(`typing()`, `R.relayoutLater`), 다른 기기 변경은 창을 닫은 뒤 항목별로 합친다(`R.pendingRemote`, `mergeBook`). 예전엔 키보드가 올라오면 쪽이 밀리고, 동기화가 화면을 다시 그려 쓰던 메모가 사라질 수 있었다.
 - 메모가 달린 문장 옆 여백에 메모 아이콘(`paintNoteMarks`, `.note-mark`): 두 쪽 보기의 왼쪽 쪽은 왼쪽 여백, 그 외엔 오른쪽 여백. 누르면 메모 창.
 - `overscroll-behavior:none`으로 안드로이드의 당겨서 새로고침을 막는다. 열려 있던 책은 `yb-open`에 기억해, 새로고침되거나 앱이 다시 열려도 그 책으로 돌아간다.
-- 맥(마우스·트랙패드)에서는 서재에서 책을 누르면 **책마다 새 창**(`openFromShelf`, 주소 `?book=<id>`, 창 이름 `book-<id>`라 같은 책은 기존 창을 앞으로). 책 창(`BOOK_WIN`)은 `yb-open`을 쓰지 않고, ‹를 누르면 창을 닫는다. 터치 기기와 **안드로이드(폴드)는 마우스·키보드를 붙여도 항상 같은 창**. Cmd/Ctrl-클릭은 항상 새 창. 설치된 앱에서는 `window.open`이 창을 열고도 `null`을 줄 수 있어, 0.6초 뒤 서재 창이 여전히 포커스일 때만 같은 창에서 연다(예전엔 서재 창까지 그 책으로 바뀌었음).
-- 어두운 지면에서는 하이라이트를 불투명에 가까운 색 + 어두운 글자(`--hl-ink`)로(`#reader.darkpage`, 실제 바탕 밝기로 판단). 기본은 은은한 금빛 톤, 보기 설정 '어두운 화면의 하이라이트: 선명하게'(`S.hlTone`, `.hl-vivid`)면 진한 형광펜. 진한 형광펜이 기본이었을 때 맥에서 너무 쨍하다고 했음. 반투명이면 갈색으로 보였음. `<meta name="color-scheme" content="light dark">`로 브라우저의 강제 다크를 막는다. 안드로이드 Chrome의 '사이트에 어두운 테마 적용'이 켜져 있으면 노랑이 겨자·갈색으로 보인다.
+- **책 창은 Apple Books처럼**(분석한 Apple Books 구조를 따름): 맥(마우스·트랙패드)에서는 서재 창 하나(`window.name='mylib-shelf'`) + 책마다 새 창(`openFromShelf`, 주소 `?book=<id>`, 창 이름 `book-<id>`). 이미 열린 책은 `BroadcastChannel('mylib-wins')`로 물어(`askOpenWindow`) 그 창을 앞으로(`window.open('', name)`, 다시 불러오지 않음, `&h=`면 그 하이라이트로). 책 창의 뒤로 버튼은 책을 닫지 않고 서재 창을 앞으로(`showShelf`), 책 창은 history를 쌓지 않는다(뒤로 스와이프로 닫히지 않게). 앱을 끌 때 열려 있던 책 창은 다음에 서재 위 '지난번 열어 둔 책' 칩으로(`yb-wins`·`yb-shelf-closed`, `offerReopen`; 브라우저가 한 번 누를 때 창 하나만 열게 해서 칩으로). 오른쪽 클릭 메뉴 '새 창으로 열기'·'책 정보'(`#cardMenu`). 새 책 창은 표지가 잠깐 보였다 펼쳐짐(`bookWindowSplash`). 터치 기기와 **안드로이드(폴드)는 같은 창**이고, 표지가 화면 가득 커지며 열리고 닫을 때 표지로 줄어든다(`bloomOpen`/`bloomClose`). 애니메이션은 창이 가려지면 멈추므로 모든 대기에 상한(`sleep`)을 둔다. 설치된 앱에서는 `window.open`이 창을 열고도 `null`을 줄 수 있어, 0.6초 뒤 서재 창이 여전히 포커스일 때만 같은 창에서 연다.
+- **하이라이트 색은 Apple Books 색표 그대로**(앱 안의 색표를 REA로 읽음): 밝은 지면은 밝은 색(`HL_LIGHT`, 노랑 #FCDC3F 등)을 85% 곱하기, 어두운 지면은 어둡고 탁한 색(`HL_DARK`, 노랑 #82611A 등)을 스크린으로 겹쳐 **글자는 밝은 그대로**. Chrome에서 blend가 불안정해 실제 바탕색과 섞은 결과를 `applyHlColors()`가 계산해 `--hl-*`에 넣는다(`syncThemeColor`에서 호출). 예전의 진한 형광펜+어두운 글자(`--hl-ink`), '선명하게' 설정은 없앴다. 밑줄은 밝은 지면 #FF3B30, 어두운 지면 #FF453A. `<meta name="color-scheme" content="light dark">`로 브라우저의 강제 다크를 막는다. 안드로이드 Chrome의 '사이트에 어두운 테마 적용'이 켜져 있으면 색이 바뀌어 보인다.
 - **각주**: 본문의 각주 번호(`epub:type=noteref`·`role=doc-noteref`, 또는 `sup` 안이나 1·[3]·*·† 같은 짧은 링크)를 누르면 쪽을 넘기지 않고 `#pop`에 각주 내용을 띄운다(`looksLikeNoteRef`, `showFootnote`, `renderNote`). 다른 장의 미주는 `getHTML`로 읽어 `noteDocs`에 잠깐 둔다. 각주 안의 '↩' 되돌아가기 링크는 지운다. `epub:type`은 `getDoc`에서 `data-et`로 옮겨 두고(CSS가 이름공간 속성을 못 잡음), `aside[data-et~=footnote]`는 본문에서 숨긴다(Apple Books처럼).
 - **문장 속 작은 그림**(원어 음역 낱말 등을 그림으로 넣은 책): 같은 문단에 글이 있고 높이 120px 이하면 `img.inl`로 글자처럼 줄 안에(1.15em). 흰 바탕은 `clearPaper()`가 canvas로 투명하게 바꾸고(`.ink`), 어두운 지면에선 `invert`. `mix-blend-mode`는 Chrome에서 제대로 안 그려져 쓰지 않는다. `sanitize()`가 책의 style을 지우므로 크기는 이렇게 추정한다.
 - 서재: Apple Books식 사이드바(전체·읽는 중·다 읽음·표시한 책·**하이라이트 · 메모**·PDF·나의 컬렉션). '하이라이트 · 메모'(`LIB.view='notes'`, `renderAllNotes`)는 모든 책의 하이라이트를 책별로 모아(최근 표시한 책 먼저), 위쪽 검색창은 문장·메모·책 제목을 찾고, 칩으로 메모만·색깔별 거르기(`LIB.nf`). 누르면 그 책을 열고 그 자리로 가서 잠깐 반짝인다(`openFromShelf(id, e, hid)` → `openBook(id, hid)` → `showHighlight`, 새 창이면 주소 `&h=`). 표지를 컬렉션으로 끌어다 놓기(마우스는 바로, 터치는 길게). 표지 이미지는 `draggable=false`(브라우저 이미지 끌기가 우리 끌기를 취소했었음). PDF 표지엔 빨간 모서리 띠.

@@ -132,6 +132,22 @@ svg.i{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.7;stro
 .an-item mark{background:var(--accent-soft);color:inherit;border-radius:2px}
 mark.hl-pulse,.hl-pulse{animation:hlPulse 1.4s ease-out 2}
 @keyframes hlPulse{0%,100%{box-shadow:0 0 0 0 transparent}40%{box-shadow:0 0 0 4px color-mix(in srgb,var(--accent) 55%,transparent)}}
+.bloom{position:fixed;z-index:80;left:0;top:0;transform-origin:0 0;pointer-events:none;border-radius:3px 6px 6px 3px;overflow:hidden;box-shadow:0 18px 50px rgba(0,0,0,.35)}
+.bloom .cover{width:100%!important;height:100%;max-width:none;border-radius:0;box-shadow:none}
+.bloom .cover img{width:100%;height:100%;object-fit:cover}
+.bloom .page{position:absolute;inset:0;opacity:0}
+.splash{position:fixed;inset:0;z-index:80;display:flex;align-items:center;justify-content:center;background:var(--r-bg,var(--bg));pointer-events:none}
+.splash .cover{height:min(62vh,520px);width:auto;aspect-ratio:2/3}
+.splash .cover img{width:100%;height:100%;object-fit:cover}
+.reopen{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0 0 22px;padding:10px 12px;border-radius:12px;background:var(--surface);border:1px solid var(--line);font-size:13.5px;color:var(--muted)}
+.reopen button{border:1px solid var(--line);background:var(--bg);color:var(--ink);font:inherit;font-size:13px;padding:5px 11px;border-radius:999px;cursor:pointer;max-width:16em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.reopen button.all{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.reopen .x{margin-left:auto;border:0;background:none;padding:4px 6px}
+#cardMenu{position:fixed;z-index:70;min-width:170px;padding:5px;border-radius:10px;background:var(--surface);border:1px solid var(--line);box-shadow:0 12px 36px rgba(0,0,0,.28)}
+#cardMenu[hidden]{display:none}
+#cardMenu button{display:block;width:100%;text-align:left;border:0;background:none;color:var(--ink);font:inherit;font-size:13.5px;padding:7px 10px;border-radius:6px;cursor:pointer}
+#cardMenu button:hover{background:var(--accent);color:#fff}
+#cardMenu hr{border:0;border-top:1px solid var(--line);margin:4px 2px}
 #grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:34px 26px}
 @media (max-width:520px){ #grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:22px 14px} .continue{gap:14px;padding:14px} .continue .cover{width:70px} }
 .card{position:relative;min-width:0;display:flex;flex-direction:column;gap:8px}
@@ -208,9 +224,6 @@ dialog.lib-dlg::backdrop{background:var(--scrim)}
 #content hr{border:0;border-top:1px solid var(--r-rule);margin:1.5em 20%}
 /* on dark pages a see-through tint turns muddy (yellow becomes brown): use a real highlighter there, with dark ink */
 /* dark pages: muted by default (bright colours glare on a dark page), vivid on request */
-#reader.darkpage{--hl-yellow:rgba(214,186,90,.60);--hl-green:rgba(120,190,140,.55);--hl-blue:rgba(126,160,230,.55);--hl-pink:rgba(230,140,170,.55);--hl-purple:rgba(170,140,230,.55);--hl-orange:rgba(230,160,100,.58);--hl-ink:#121316}
-#reader.darkpage.hl-vivid{--hl-yellow:rgba(250,206,40,.86);--hl-green:rgba(112,206,140,.82);--hl-blue:rgba(122,170,255,.82);--hl-pink:rgba(255,135,172,.82);--hl-purple:rgba(182,146,255,.82);--hl-orange:rgba(255,168,88,.84);--hl-ink:#14161B}
-mark.ann.hl{color:var(--hl-ink,inherit)}
 mark.ann{color:inherit;background:transparent;border-radius:2px;cursor:pointer;-webkit-box-decoration-break:clone;box-decoration-break:clone}
 mark.hl.c-yellow{background:var(--hl-yellow)} mark.hl.c-green{background:var(--hl-green)} mark.hl.c-blue{background:var(--hl-blue)} mark.hl.c-pink{background:var(--hl-pink)} mark.hl.c-purple{background:var(--hl-purple)} mark.hl.c-orange{background:var(--hl-orange)}
 mark.ul{text-decoration:underline;text-decoration-color:var(--ul-red);text-decoration-thickness:2px;text-underline-offset:.24em;text-decoration-skip-ink:none}
@@ -370,7 +383,7 @@ mark.pend{background:var(--hl-yellow);color:inherit;outline:1.5px dashed var(--a
 #extbar{position:absolute;z-index:6;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 40px);display:flex;align-items:center;gap:4px;padding:5px 5px 5px 16px;border-radius:999px;background:var(--r-fg);color:var(--r-bg);box-shadow:0 8px 24px rgba(0,0,0,.25);font-size:13.5px;white-space:nowrap;max-width:calc(100% - 24px);animation:fade .2s}
 #extbar span{overflow:hidden;text-overflow:ellipsis}
 #extbar button{border:0;background:color-mix(in srgb,var(--r-bg) 14%,transparent);color:inherit;cursor:pointer;height:34px;border-radius:999px;padding:0 14px;font-size:13px;flex:none}
-.dot.c-yellow{background:#F5C22E} .dot.c-green{background:#4FB86C} .dot.c-blue{background:#4E8BF5} .dot.c-pink{background:#F0628E} .dot.c-purple{background:#9B6BF0} .dot.c-orange{background:#F2913A}
+.dot.c-yellow{background:#FCDC3F} .dot.c-green{background:#99DC82} .dot.c-blue{background:#95B9FF} .dot.c-pink{background:#FF9BB4} .dot.c-purple{background:#C5AFFB} .dot.c-orange{background:#FFBE7A}
 #selbar button[aria-pressed="true"] .dot,#selbar button[aria-pressed="true"] .ul-ico{box-shadow:0 0 0 2px var(--r-fg),0 0 0 4px var(--r-bg)}
 .dot.picker{position:relative}
 .dot.picker::after{content:"";position:absolute;right:-4px;bottom:-4px;width:10px;height:10px;border-radius:50%;background:conic-gradient(#F0628E,#F2913A,#F5C22E,#4FB86C,#4E8BF5,#9B6BF0,#F0628E);border:1.5px solid var(--r-fg)}
@@ -438,6 +451,7 @@ mark.pend{background:var(--hl-yellow);color:inherit;outline:1.5px dashed var(--a
 </section>
 <div id="drop" hidden>여기에 놓으면 서재에 추가돼요</div>
 <dialog class="lib-dlg" id="libDlg"></dialog>
+<div id="cardMenu" role="menu" hidden></div>
 
 <section id="reader" hidden aria-label="책 읽기">
   <div id="stage">
@@ -483,6 +497,7 @@ const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const sleep = ms => new Promise(r => setTimeout(r, ms));
 const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const coarse = matchMedia('(pointer: coarse)').matches;
 const withTimeout = (p, ms, v = null) => Promise.race([p, new Promise(r => setTimeout(() => r(v), ms))]);
@@ -830,6 +845,7 @@ async function renderLibrary() {
   };
   const MK = new Map(raw.map(b => [b.id, marksOf2(b.id)]));
   const all = raw.map(b => displayMeta(b, states.get(b.id)));
+  LIB.all = all;
   const prog = id => states.get(id)?.progress || 0;
   const inView = {
     all: () => true,
@@ -883,9 +899,10 @@ async function renderLibrary() {
     : 'EPUB·TXT 파일을 이 창에 끌어다 놓거나 ‘책 추가’를 누르세요. 가져온 책은 이 기기에만 저장돼요.<br>‘Google Drive 연결’을 누르면 Drive 책 폴더를 서재로 쓰고, 다른 기기와 읽은 위치·하이라이트를 맞출 수 있어요.';
   updateDriveChip();
   LIB.books = books;
+  renderReopen();
 }
 const LIB = { books: [], view: ls.get('yb-view', 'all'), q: '', nf: 'all' };
-const HL_SW = { yellow: '#F5C22E', green: '#4FB86C', blue: '#4E8BF5', pink: '#F0628E', purple: '#9B6BF0', orange: '#F2913A', red: '#E5484D' };
+const HL_SW = { yellow: '#FCDC3F', green: '#99DC82', blue: '#95B9FF', pink: '#FF9BB4', purple: '#C5AFFB', orange: '#FFBE7A', red: '#FF3B30' };
 const HL_NAME = { yellow: '노랑', green: '초록', blue: '파랑', pink: '분홍', purple: '보라', orange: '주황', red: '밑줄' };
 const hlColorKey = h => h.kind === 'ul' ? 'red' : h.color || 'yellow';
 const hlPosCmp = (a, b) => a.ch - b.ch || (a.s?.b ?? a.rects?.[0]?.y ?? 0) - (b.s?.b ?? b.rects?.[0]?.y ?? 0) || (a.s?.o ?? 0) - (b.s?.o ?? 0);
@@ -1068,13 +1085,13 @@ async function openBook(id, hid) {
     const shown = displayMeta({ title: meta.title || book.title, author: meta.author ?? book.author }, R.st);
     $('#tbTitle').textContent = shown.title; $('#tbAuthor').textContent = shown.author || '';
     library.hidden = true; reader.hidden = false; reader.classList.remove('ui-hidden');
-    try { history.pushState({ reader: 1 }, ''); } catch {}
+    if (!BOOK_WIN) try { history.pushState({ reader: 1 }, ''); } catch {}
     applySettings();
     const goH = hid && R.st.highlights.find(h => h.id === hid);
     await renderChapter(goH ? goH.ch : R.st.loc?.ch || 0, { block: goH ? goH.s?.b || 0 : R.st.loc?.block || 0 }, false);
     if (goH) showHighlight(goH);
     if (!BOOK_WIN) ls.set('yb-open', id); // book windows come back through their own address
-    if (BOOK_WIN) document.title = `${shown.title} — My Library`;
+    if (BOOK_WIN) { document.title = `${shown.title} — My Library`; noteBookWindowOpen(id); }
     requestWake(); relayWarm();
     indexBook(book);
     applyLegacy();
@@ -1099,18 +1116,172 @@ function cardStatus(id, text) {
 // Mac (mouse/trackpad): each book opens in its own window, named after the book so a second click
 // brings that window forward. Touch devices keep the same window. Cmd/Ctrl-click always opens a window.
 const BOOK_WIN = new URLSearchParams(location.search).get('book'); // this window was opened for one book
-function openFromShelf(id, e, hid) {
-  const android = /Android/i.test(navigator.userAgent); // the Fold always reads in the same window
-  if (!android && (!coarse || e?.metaKey || e?.ctrlKey)) {
+/* ---- book windows (Mac): like Apple Books, the shelf is one window and every book gets its own ----
+   Clicking a book that already has a window brings that window forward instead of reloading it; ‹ in a book window
+   shows the shelf without closing the book; book windows that were open when the app quit are offered again. */
+const WINS = new BroadcastChannel('mylib-wins');
+const bookWinMode = () => !/Android/i.test(navigator.userAgent) && !coarse; // the Fold always reads in the same window
+if (!BOOK_WIN) try { window.name = 'mylib-shelf'; } catch {}
+function askOpenWindow(id, msg, wait = 160) { // does a window already show this book? it answers and comes forward
+  return new Promise(res => {
+    const t = setTimeout(() => { WINS.removeEventListener('message', on); res(false); }, wait);
+    const on = e => { if (e.data?.type === 'here' && e.data.id === id) { clearTimeout(t); WINS.removeEventListener('message', on); res(true); } };
+    WINS.addEventListener('message', on);
+    WINS.postMessage({ type: 'where', id, ...msg });
+  });
+}
+async function openFromShelf(id, e, hid, force) {
+  if (force || (bookWinMode() || e?.metaKey || e?.ctrlKey) && !/Android/i.test(navigator.userAgent)) {
+    const name = 'book-' + id;
+    if (await askOpenWindow(id, { hid })) { // already open: bring it forward (and jump to the highlight there)
+      try { const w = window.open('', name); if (w && w.location.href !== 'about:blank') { w.focus(); return; } if (w) w.close(); } catch {}
+      return;
+    }
     const url = new URL(location.href); url.search = '?book=' + encodeURIComponent(id) + (hid ? '&h=' + encodeURIComponent(hid) : ''); url.hash = '';
-    const w = window.open(url.href, 'book-' + id, 'width=1200,height=860');
+    const w = window.open(url.href, name, 'width=1200,height=860');
     if (w) { try { w.focus(); } catch {} return; }
     // an installed app may hand back null although the window did open — only fall back if focus never left the shelf
     setTimeout(() => { if (document.hasFocus() && reader.hidden) openBook(id, hid); }, 600);
     return;
   }
-  openBook(id, hid);
+  // same window (the Fold): the cover grows into the page, as in Apple Books
+  const src = e?.target?.closest?.('.card, .continue, .an-book')?.querySelector('.cover');
+  const fx = src && !reduceMotion ? bloomOpen(src) : null;
+  await openBook(id, hid);
+  fx?.done(!reader.hidden);
 }
+// ‹ in a book window: show the shelf window, leave this book open
+function showShelf() {
+  saveNow();
+  let w = null;
+  try { if (window.opener && !window.opener.closed && window.opener.name === 'mylib-shelf') w = window.opener; } catch {}
+  if (!w) try { w = window.open('', 'mylib-shelf'); if (w && w.location.href === 'about:blank') w.location.replace(location.pathname); } catch {}
+  try { w?.focus(); } catch {}
+  WINS.postMessage({ type: 'shelf' }); // the shelf focuses itself too, where the browser allows it
+}
+WINS.addEventListener('message', e => {
+  const d = e.data || {};
+  if (d.type === 'shelf' && !BOOK_WIN) { try { window.focus(); } catch {} renderLibrary(); }
+  if (BOOK_WIN && d.type === 'where' && d.id === BOOK_WIN) {
+    WINS.postMessage({ type: 'here', id: BOOK_WIN });
+    try { window.focus(); } catch {}
+    const h = d.hid && R.st?.highlights.find(x => x.id === d.hid);
+    if (h) renderChapter(h.ch, { block: h.s?.b || 0 }).then(() => showHighlight(h));
+  }
+  if (BOOK_WIN && d.type === 'ping') WINS.postMessage({ type: 'pong', id: BOOK_WIN });
+});
+// the cover grows to fill the screen while the book loads, then the page shows through
+function bloomOpen(coverEl) {
+  const r = coverEl.getBoundingClientRect(), W = innerWidth, H = innerHeight;
+  const el = document.createElement('div'); el.className = 'bloom';
+  el.appendChild(coverEl.cloneNode(true));
+  const pageLayer = document.createElement('div'); pageLayer.className = 'page'; el.appendChild(pageLayer);
+  Object.assign(el.style, { width: r.width + 'px', height: r.height + 'px', transform: `translate(${r.left}px,${r.top}px)` });
+  pageLayer.style.background = getComputedStyle(reader).backgroundColor;
+  document.body.appendChild(el);
+  const sx = W / r.width, sy = H / r.height;
+  const grow = el.animate([{ transform: `translate(${r.left}px,${r.top}px) scale(1)` }, { transform: `translate(0,0) scale(${sx},${sy})`, borderRadius: '0' }], { duration: 420, easing: 'cubic-bezier(.2,.8,.2,1)', fill: 'forwards' });
+  pageLayer.animate([{ opacity: 0 }, { opacity: 0, offset: .45 }, { opacity: 1 }], { duration: 420, fill: 'forwards' });
+  return {
+    async done(ok) {
+      // animations stall in a hidden window, so every wait has a ceiling: the overlay must never stay over the book
+      await Promise.race([grow.finished.catch(() => {}), sleep(600)]);
+      await Promise.race([el.animate([{ opacity: 1 }, { opacity: 0 }], { duration: ok ? 180 : 120, fill: 'forwards' }).finished.catch(() => {}), sleep(300)]);
+      el.remove();
+    },
+  };
+}
+// closing in the same window: the page shrinks back onto its cover on the shelf.
+// The page-coloured layer goes up before the reader hides, so the shelf never flashes in between.
+function bloomClose() {
+  if (reduceMotion) return { to() {} };
+  const W = innerWidth, H = innerHeight;
+  const el = document.createElement('div'); el.className = 'bloom';
+  Object.assign(el.style, { width: W + 'px', height: H + 'px', borderRadius: 0, boxShadow: 'none' });
+  const pageLayer = document.createElement('div'); pageLayer.className = 'page'; pageLayer.style.opacity = 1;
+  pageLayer.style.background = getComputedStyle(reader).backgroundColor; el.appendChild(pageLayer);
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 1200); // a stalled animation (hidden window) must not leave the overlay behind
+  const fade = () => el.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 200, fill: 'forwards' }).finished.then(() => el.remove(), () => el.remove());
+  return {
+    to(id) {
+      const target = [...document.querySelectorAll(`[data-open="${CSS.escape(id)}"]`)].map(b => b.closest('.card, .continue')?.querySelector('.cover')).find(c => c && c.getBoundingClientRect().width);
+      const r = target?.getBoundingClientRect();
+      if (!r || r.bottom < 0 || r.top > H) return fade();
+      el.prepend(target.cloneNode(true));
+      Object.assign(el.style, { width: r.width + 'px', height: r.height + 'px', borderRadius: '', boxShadow: '' });
+      const sx = W / r.width, sy = H / r.height;
+      el.animate([{ transform: `translate(0,0) scale(${sx},${sy})`, borderRadius: '0' }, { transform: `translate(${r.left}px,${r.top}px) scale(1)` }], { duration: 380, easing: 'cubic-bezier(.3,.7,.2,1)', fill: 'forwards' })
+        .finished.then(() => el.remove(), () => el.remove());
+      pageLayer.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 300, fill: 'forwards' });
+    },
+  };
+}
+// a fresh book window shows the cover for a moment and opens into the page
+async function bookWindowSplash(id) {
+  if (reduceMotion) return () => {};
+  const m = await store.get('books', id).catch(() => null);
+  if (!m?.cover) return () => {};
+  const el = document.createElement('div'); el.className = 'splash';
+  el.innerHTML = coverHTML({ ...m, id: m.id || id, title: m.title || '' });
+  document.body.appendChild(el);
+  return async () => {
+    const c = el.querySelector('.cover');
+    c?.animate([{ transform: 'scale(1)', opacity: 1 }, { transform: 'scale(1.6)', opacity: 0 }], { duration: 380, easing: 'cubic-bezier(.2,.8,.2,1)', fill: 'forwards' });
+    await Promise.race([el.animate([{ opacity: 1 }, { opacity: 1, offset: .4 }, { opacity: 0 }], { duration: 420, fill: 'forwards' }).finished.catch(() => {}), sleep(700)]);
+    el.remove();
+  };
+}
+/* reopen the book windows that were open when the app was quit (the browser lets a page open only one window per click,
+   so they come back as one-click chips on the shelf rather than all at once) */
+const winLog = () => ls.get('yb-wins', {});
+if (BOOK_WIN) addEventListener('pagehide', () => { const w = winLog(); if (w[BOOK_WIN]) { w[BOOK_WIN].closedAt = Date.now(); ls.set('yb-wins', w); } });
+else addEventListener('pagehide', () => ls.set('yb-shelf-closed', Date.now()));
+function noteBookWindowOpen(id) { const w = winLog(); w[id] = { at: Date.now() }; ls.set('yb-wins', w); }
+async function offerReopen() {
+  if (BOOK_WIN || !bookWinMode()) return;
+  const log = winLog(), quitAt = ls.get('yb-shelf-closed', 0);
+  // still open, or closed together with the shelf (the app quit) — not ones closed earlier by hand
+  let ids = Object.entries(log).filter(([, v]) => !v.closedAt || (quitAt && v.closedAt >= quitAt - 5000)).map(([k]) => k);
+  if (!ids.length) return;
+  const alive = new Set(); const on = e => { if (e.data?.type === 'pong') alive.add(e.data.id); };
+  WINS.addEventListener('message', on); WINS.postMessage({ type: 'ping' });
+  await new Promise(r => setTimeout(r, 250)); WINS.removeEventListener('message', on);
+  ids = ids.filter(id => !alive.has(id) && LIB.all?.some(b => b.id === id));
+  ls.set('yb-wins', Object.fromEntries(Object.entries(log).filter(([k]) => alive.has(k))));
+  if (ids.length) { REOPEN.ids = ids; renderReopen(); }
+}
+const REOPEN = { ids: [] };
+function renderReopen() {
+  $('.reopen')?.remove();
+  if (!REOPEN.ids.length || LIB.view !== 'all') return;
+  const box = document.createElement('div'); box.className = 'reopen';
+  const title = id => LIB.all.find(b => b.id === id)?.title || '책';
+  box.innerHTML = `<span>지난번 열어 둔 책</span>${REOPEN.ids.map(id => `<button data-reopen="${esc(id)}">${esc(title(id))}</button>`).join('')}<button class="x" aria-label="닫기">✕</button>`;
+  box.onclick = e => {
+    const b = e.target.closest('button'); if (!b) return;
+    if (b.classList.contains('x')) REOPEN.ids = [];
+    else { REOPEN.ids = REOPEN.ids.filter(x => x !== b.dataset.reopen); openFromShelf(b.dataset.reopen, e, null, true); }
+    renderReopen();
+  };
+  $('#continue').before(box);
+}
+/* right-click a book (Mac): open in a new window, or its details */
+const cardMenu = $('#cardMenu');
+function showCardMenu(id, x, y) {
+  cardMenu.innerHTML = `<button data-m="win">새 창으로 열기</button>${id === 'sample' ? '' : '<hr><button data-m="info">책 정보…</button>'}`;
+  cardMenu.hidden = false;
+  const w = cardMenu.offsetWidth, h = cardMenu.offsetHeight;
+  Object.assign(cardMenu.style, { left: Math.min(x, innerWidth - w - 8) + 'px', top: Math.min(y, innerHeight - h - 8) + 'px' });
+  cardMenu.onclick = e => {
+    const m = e.target.closest('[data-m]')?.dataset.m; if (!m) return;
+    cardMenu.hidden = true;
+    if (m === 'win') openFromShelf(id, e, null, true);
+    else openBookDialog(LIB.books.find(b => b.id === id));
+  };
+}
+addEventListener('pointerdown', e => { if (!cardMenu.hidden && !cardMenu.contains(e.target)) cardMenu.hidden = true; }, true);
+addEventListener('keydown', e => { if (e.key === 'Escape') cardMenu.hidden = true; });
 function closeReader() {
   if (!R.book) return;
   cancelExtend(); hideHandles(); closePop(); clearSel(); saveNow(); closeSheet(); hideSelbar();
@@ -1120,10 +1291,13 @@ function closeReader() {
     return;
   }
   ls.set('yb-open', null);
+  const was = R.id, fx = bloomClose();
   R.book = null; reader.hidden = true; library.hidden = false; paintNoteMarks();
-  releaseWake(); renderLibrary();
+  releaseWake();
+  renderLibrary().then(() => fx.to(was), () => fx.to(null));
 }
-$('#backBtn').onclick = () => { if (history.state?.reader) history.back(); else closeReader(); };
+$('#backBtn').onclick = () => { if (BOOK_WIN) showShelf(); else if (history.state?.reader) history.back(); else closeReader(); };
+if (BOOK_WIN) { $('#backBtn').setAttribute('aria-label', '서재 보기'); $('#backBtn').title = '서재 보기'; }
 addEventListener('popstate', () => {
   if (!R.book) return;
   if (!sheet.hidden) { closeSheet(); try { history.pushState({ reader: 1 }, ''); } catch {} return; }
@@ -2155,7 +2329,6 @@ function renderSettings() {
   const seg = (k, opts) => `<div class="seg">${opts.map(([v, l]) => `<button data-set="${k}" data-val="${v}" aria-pressed="${String(S[k]) === String(v)}">${l}</button>`).join('')}</div>`;
   body().innerHTML = `
   ${R.book?.isPdf ? `<div class="field"><span class="lbl">PDF 화면 맞춤</span>${seg('pdfFit', [['page', '쪽 전체'], ['width', '폭에 맞춤']])}</div>` : ''}
-  <div class="field"><span class="lbl">어두운 화면의 하이라이트</span>${seg('hlTone', [['soft', '은은하게'], ['vivid', '선명하게']])}</div>
   <div class="field"><span class="lbl">지면 색</span><div class="seg">${THEMES.map(([v, l, bg]) => `<button class="swatch" data-set="theme" data-val="${v}" aria-pressed="${S.theme === v}"><i style="background:${bg}"></i>${l}</button>`).join('')}</div></div>
   <div class="field"><span class="lbl">글꼴</span><div class="seg">${Object.entries(FONTS).map(([k, f]) => `<button class="fontbtn" data-set="font" data-val="${k}" aria-pressed="${S.font === k}"><b style="font-family:${esc(f.stack)}">가나다</b><small>${f.name}</small></button>`).join('')}</div></div>
   <div class="field"><span class="lbl">글자 크기</span><div class="stepper"><button data-step="size" data-d="-1" aria-label="작게">가−</button><output id="sizeOut">${S.size}px</output><button data-step="size" data-d="1" aria-label="크게">가+</button></div></div>
@@ -2193,7 +2366,6 @@ function changeSetting(k, v) {
 }
 function applySettings() {
   reader.classList.toggle('touchsel', coarse);
-  reader.classList.toggle('hl-vivid', S.hlTone === 'vivid');
   setTimeout(syncThemeColor);
   reader.dataset.rt = S.theme;
   const st = reader.style;
@@ -2814,7 +2986,11 @@ function addToCol(colId, bookId) {
 
 /* --- drag a cover onto a collection: mouse drags right away, touch after a long press --- */
 const DRAG = { on: false, timer: 0 };
-$('#grid').addEventListener('contextmenu', e => { if (e.target.closest('.cover-btn')) e.preventDefault(); });
+$('#grid').addEventListener('contextmenu', e => {
+  const card = e.target.closest('.card'); if (!card) return;
+  e.preventDefault();
+  if (!coarse && !/Android/i.test(navigator.userAgent)) showCardMenu(card.dataset.id, e.clientX, e.clientY);
+});
 $('#library').addEventListener('dragstart', e => { if (e.target.closest?.('.cover-btn, .continue')) e.preventDefault(); });
 $('#grid').addEventListener('pointerdown', e => {
   const btn = e.target.closest('.cover-btn'); if (!btn || e.button > 0) return;
@@ -3157,17 +3333,33 @@ if ('launchQueue' in window) launchQueue.setConsumer(async p => { if (p.files?.l
   } catch {}
 })();
 
+// Highlight colours as Apple Books paints them (its own colour table, read from the app):
+// light pages multiply the light colour at 85 %; dark pages *screen* a deep, muted colour, so the text stays light.
+// Blend modes don't render reliably in Chrome, so the blended result is computed here for the actual page colour.
+const HL_LIGHT = { yellow: '#FCDC3F', green: '#99DC82', blue: '#95B9FF', pink: '#FF9BB4', purple: '#C5AFFB', orange: '#FFBE7A' };
+const HL_DARK = { yellow: '#82611A', green: '#3D6621', blue: '#335191', pink: '#7A3D58', purple: '#5E4582', orange: '#84501E' };
+function applyHlColors(bg, dark) {
+  const rgb = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
+  for (const [k, hex] of Object.entries(dark ? HL_DARK : HL_LIGHT)) {
+    const c = rgb(hex);
+    const out = bg.map((b, i) => dark ? 255 - (255 - b) * (255 - c[i]) / 255 : b * 0.15 + (b * c[i] / 255) * 0.85);
+    reader.style.setProperty('--hl-' + k, `rgb(${out.map(Math.round).join(',')})`);
+  }
+  reader.style.setProperty('--ul-red', dark ? '#FF453A' : '#FF3B30');
+}
 // the installed app's title bar takes this colour: match whatever screen is showing
 function syncThemeColor() {
   const el = reader.hidden ? document.body : reader;
   const c = getComputedStyle(el).backgroundColor;
   const [r, g, b] = (getComputedStyle(reader).backgroundColor.match(/\d+(\.\d+)?/g) || [255, 255, 255]).map(Number);
-  reader.classList.toggle('darkpage', 0.2126 * r + 0.7152 * g + 0.0722 * b < 110); // dark page → solid highlighter colours
+  const dark = 0.2126 * r + 0.7152 * g + 0.0722 * b < 110;
+  reader.classList.toggle('darkpage', dark);
+  applyHlColors([r, g, b], dark);
   const m = $('#themeColor'); if (m && c) m.setAttribute('content', c);
 }
 new MutationObserver(syncThemeColor).observe(reader, { attributes: true, attributeFilter: ['hidden', 'data-rt'] });
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => setTimeout(syncThemeColor, 50));
-const APP_VERSION = 'v17';
+const APP_VERSION = 'v18';
 $('#appVer').textContent = 'My Library ' + APP_VERSION;
 // reopen the book that was open (a reload or Android closing the app in the background lands back in it).
 // The flag is cleared first and set again once the book opens, so a missing book isn't retried forever.
@@ -3175,8 +3367,9 @@ renderLibrary().then(() => {
   if (BOOK_WIN) {
     const hid = new URLSearchParams(location.search).get('h');
     if (hid) try { history.replaceState(history.state, '', '?book=' + encodeURIComponent(BOOK_WIN)); } catch {} // a reload resumes reading, not the jump
-    return openBook(BOOK_WIN, hid);
+    return bookWindowSplash(BOOK_WIN).then(async done => { await openBook(BOOK_WIN, hid); done(); });
   }
+  offerReopen();
   const o = ls.get('yb-open', null); if (o && reader.hidden) { ls.set('yb-open', null); openBook(o); }
 });
 // the shelf shows fresh progress when you come back to it from a book window
