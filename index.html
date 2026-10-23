@@ -1552,6 +1552,56 @@ addEventListener('resize', scheduleRelayout);
 visualViewport?.addEventListener('resize', scheduleRelayout);
 document.fonts?.addEventListener?.('loadingdone', scheduleRelayout);
 
+/* ---- page-turn timing, measured on the reader's own device and book (the lag can depend on both) ---- */
+async function runPerfCheck() {
+  if (!R.book || R.book.isPdf) return;
+  toast('쪽 넘김 속도를 재는 중… (약 8초)');
+  await sleep(2700);
+  const start = R.page, T = f => { const t = performance.now(); f(); return performance.now() - t; };
+  const long = []; let po = null;
+  try { po = new PerformanceObserver(l => l.getEntries().forEach(e => long.push({ t: e.startTime, d: e.duration, n: e.attribution?.[0]?.containerName || e.attribution?.[0]?.name || '' }))); po.observe({ type: 'longtask', buffered: false }); } catch {}
+  const frames = []; let on = true;
+  const loop = t => { frames.push(t); if (on) requestAnimationFrame(loop); };
+  requestAnimationFrame(loop);
+  const turns = [];
+  for (let i = 0; i < 8; i++) {
+    if (R.page >= R.pages - 1) goPage(0, false);
+    await sleep(120);
+    const t0 = performance.now();
+    const sync = T(() => goPage(R.page + 1, true));
+    await sleep(650);
+    const t1 = performance.now();
+    const fr = frames.filter(t => t >= t0 && t <= t1), gaps = fr.slice(1).map((t, k) => t - fr[k]);
+    turns.push({ sync, frames: fr.length, worst: gaps.length ? Math.max(...gaps) : -1, slow: gaps.filter(g => g > 34).length, longMs: long.filter(e => e.t >= t0 && e.t <= t1).reduce((a, e) => a + e.d, 0) });
+  }
+  on = false; po?.disconnect();
+  const read = () => document.body.offsetHeight;
+  read(); $('#footLeft').textContent += ' '; const relayoutMs = T(read);
+  const settleMs = T(() => { afterMove(); read(); });
+  const iconsMs = T(() => { paintNoteMarks(); read(); });
+  const anchorMs = T(() => currentAnchor());
+  let canonMs = 0; try { canonMs = T(() => canon(R.st)); } catch {}
+  goPage(start, false);
+  const hs = R.st.highlights || [], inCh = hs.filter(h => h.ch === R.ch);
+  const f1 = n => (Math.round(n * 10) / 10).toString();
+  const lines = [
+    `My Library ${APP_VERSION} · ${navigator.userAgent.match(/(Chrome|CriOS|SamsungBrowser)\/[\d.]+/)?.[0] || ''} · ${coarse ? '터치' : '마우스'} · 창 ${innerWidth}×${innerHeight} @${devicePixelRatio}`,
+    `책: ${R.meta?.title || R.id} · ${R.ch + 1}/${R.book.chapters.length}장 · 쪽 ${R.pages} · 블록 ${R.blocks.length} · 요소 ${content.querySelectorAll('*').length} · 그림 ${content.querySelectorAll('img').length}(글자그림 ${content.querySelectorAll('img.inl').length}) · 링크 ${content.querySelectorAll('a').length}`,
+    `보기: ${themeKey()} · ${S.mode} · ${reader.classList.contains('spread') ? '두 쪽' : '한 쪽'} · ${S.size}px · 줄 ${S.lh} · 책 창 ${BOOK_WIN ? '예' : '아니오'}`,
+    `하이라이트: 이 책 ${hs.length}개(이 장 ${inCh.length}, 메모 ${inCh.filter(h => h.note).length}) · 책갈피 ${(R.st.bookmarks || []).length} · 지운 기록 ${(R.st.tomb || []).length}`,
+    `동기화: ${G.on ? '켜짐' : '꺼짐'}${G.syncing ? ' (진행 중)' : ''}`,
+    `넘김 8번 (ms): ${turns.map(t => `[코드 ${f1(t.sync)} · 프레임 ${t.frames} · 최악 ${f1(t.worst)} · 끊김 ${t.slow} · 긴작업 ${f1(t.longMs)}]`).join(' ')}`,
+    `재배치 ${f1(relayoutMs)} · 넘긴 뒤 처리 ${f1(settleMs)} · 메모 아이콘 ${f1(iconsMs)} · 위치 계산 ${f1(anchorMs)} · 상태 비교 ${f1(canonMs)}`,
+    `긴 작업: ${long.length}개, 합 ${f1(long.reduce((a, e) => a + e.d, 0))}ms${long.length ? ' · ' + long.slice(0, 6).map(e => f1(e.d) + (e.n ? '(' + e.n + ')' : '')).join(', ') : ''}`,
+  ];
+  const text = lines.join('\n');
+  console.log('[perf]\n' + text);
+  closePop(); hideSelbar(); sheetKind = 'perf'; $('#scrim').hidden = false; sheet.hidden = false;
+  $('#sheetTitle').textContent = '쪽 넘김 측정 결과';
+  body().innerHTML = `<pre style="white-space:pre-wrap;font-size:12px;line-height:1.55;margin:0 0 12px">${esc(text)}</pre><button class="btn primary" id="perfCopy" style="width:100%">결과 복사</button>`;
+  $('#perfCopy').onclick = () => copyText(text);
+}
+
 /* ================= progress & chrome ================= */
 function chTitle(i) {
   const toc = R.book?.toc || [];
@@ -2401,7 +2451,8 @@ function renderSettings() {
     </div>
   <div class="field"><span class="lbl">두 쪽 보기</span>${seg('spread', [['auto', '자동'], ['always', '항상 두 쪽'], ['never', '항상 한 쪽']])}
     <small style="color:var(--r-muted);font-size:12px;line-height:1.5">폴드를 펼쳤는데 한 쪽만 나오면 ‘항상 두 쪽’으로 두세요.</small></div>
-  <div class="field"><label for="cpmIn">읽기 속도 <span id="cpmOut">1분에 ${S.cpm}자</span></label><input type="range" id="cpmIn" min="250" max="1200" step="50" value="${S.cpm}"></div>`;
+  <div class="field"><label for="cpmIn">읽기 속도 <span id="cpmOut">1분에 ${S.cpm}자</span></label><input type="range" id="cpmIn" min="250" max="1200" step="50" value="${S.cpm}"></div>
+  ${R.book && !R.book.isPdf ? `<div class="field"><button class="btn" id="perfBtn" style="width:100%">쪽 넘김 속도 측정</button><small style="color:var(--r-muted);font-size:12px;line-height:1.5">버벅이는 책에서 눌러 주세요. 쪽을 8번 넘겨 보며 어디서 시간이 드는지 재고, 결과를 복사할 수 있어요.</small></div>` : ''}`;
   body().onclick = e => {
     const b = e.target.closest('button'); if (!b) return;
     if (b.dataset.set === 'btheme' && BOOK_THEMES[b.dataset.val]?.lh) S.lh = BOOK_THEMES[b.dataset.val].lh;
@@ -2414,6 +2465,7 @@ function renderSettings() {
   $('#cpmIn').oninput = e => $('#cpmOut').textContent = `1분에 ${e.target.value}자`;
   $('#cpmIn').onchange = e => changeSetting('cpm', +e.target.value);
   $('#justIn').onchange = e => changeSetting('justify', e.target.checked);
+  if ($('#perfBtn')) $('#perfBtn').onclick = () => { closeSheet(); setTimeout(runPerfCheck, 300); };
 }
 function changeSetting(k, v) {
   const a = R.book ? (R.anchor ?? currentAnchor()) : 0;
@@ -3449,7 +3501,7 @@ function syncThemeColor() {
 }
 new MutationObserver(syncThemeColor).observe(reader, { attributes: true, attributeFilter: ['hidden', 'data-rt'] });
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { if (S.appearance === 'auto') applySettings(); setTimeout(syncThemeColor, 50); });
-const APP_VERSION = 'v20';
+const APP_VERSION = 'v21';
 $('#appVer').textContent = 'My Library ' + APP_VERSION;
 // reopen the book that was open (a reload or Android closing the app in the background lands back in it).
 // The flag is cleared first and set again once the book opens, so a missing book isn't retried forever.
