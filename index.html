@@ -10,7 +10,7 @@
 <link rel="apple-touch-icon" href="icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&family=IBM+Plex+Sans+KR:wght@400;500;600&family=Nanum+Myeongjo:wght@400;700&family=Noto+Sans+KR:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&family=IBM+Plex+Sans+KR:wght@400;500;600&family=Nanum+Myeongjo:wght@400;700&family=Noto+Sans+KR:wght@400;500;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,700&family=Lora:wght@400;700&family=Figtree:wght@400;600;700&display=swap">
 <style>
 /* Layout: library = shelf of covers under a "continue" card; reader = full-bleed page with overlay chrome that hides while reading; panels slide from the right (desktop) or up from the bottom (phone). */
 :root{
@@ -35,9 +35,6 @@
   --scrim:rgba(0,0,0,.5); --shadow:0 1px 2px rgba(0,0,0,.3),0 10px 28px rgba(0,0,0,.35);
   --r-bg:#16181D; --r-fg:#CDD0D8; --r-muted:#80869A; --r-rule:#2A2D36; --r-panel:#1C1F26; --r-link:#9EAAFF;
   color-scheme:dark }
-#reader[data-rt="paper"]{ --r-bg:#FFFFFF; --r-fg:#202329; --r-muted:#7A8091; --r-rule:#E6E8ED; --r-panel:#FFFFFF; --r-link:#3446A8; --accent:#3446A8; --accent-ink:#fff; --accent-soft:rgba(52,70,168,.12); --ribbon:#B23A3E; color-scheme:light }
-#reader[data-rt="sepia"]{ --r-bg:#F2E9D8; --r-fg:#4A3B2A; --r-muted:#8C7A62; --r-rule:#DFD2BA; --r-panel:#F7F0E2; --r-link:#7A4A1E; --accent:#8A5526; --accent-ink:#fff; --accent-soft:rgba(138,85,38,.14); --ribbon:#A63A2E; color-scheme:light }
-#reader[data-rt="night"]{ --r-bg:#0F1114; --r-fg:#B9BDC6; --r-muted:#737987; --r-rule:#24272E; --r-panel:#171A1F; --r-link:#9EAAFF; --accent:#8E9BFF; --accent-ink:#0F1114; --accent-soft:rgba(142,155,255,.16); --ribbon:#D9625F; color-scheme:dark }
 
 [hidden]{display:none!important}
 html,body{height:100%;overscroll-behavior:none}
@@ -204,7 +201,7 @@ dialog.lib-dlg::backdrop{background:var(--scrim)}
 #reader.scroll #stage{touch-action:auto}
 #page{position:absolute;top:calc(env(safe-area-inset-top,0px) + 46px);bottom:calc(env(safe-area-inset-bottom,0px) + 42px);left:max(var(--mx),calc((100% - var(--maxw)) / 2));right:max(var(--mx),calc((100% - var(--maxw)) / 2));overflow:hidden;font-size:var(--r-size,19px)}
 #reader.scroll #page{overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin}
-#content{font-family:var(--r-font);font-size:var(--r-size,19px);line-height:var(--r-lh,1.8);color:var(--r-fg);word-break:keep-all;overflow-wrap:break-word;orphans:2;widows:2;will-change:transform}
+#content{font-weight:var(--r-weight,400);font-family:var(--r-font);font-size:var(--r-size,19px);line-height:var(--r-lh,1.8);color:var(--r-fg);word-break:keep-all;overflow-wrap:break-word;orphans:2;widows:2;will-change:transform}
 #content p{margin:0 0 .85em}
 #content.justify{word-break:normal;line-break:strict}
 #content.justify p,#content.justify li{text-align:justify}
@@ -224,6 +221,7 @@ dialog.lib-dlg::backdrop{background:var(--scrim)}
 #content hr{border:0;border-top:1px solid var(--r-rule);margin:1.5em 20%}
 /* on dark pages a see-through tint turns muddy (yellow becomes brown): use a real highlighter there, with dark ink */
 /* dark pages: muted by default (bright colours glare on a dark page), vivid on request */
+mark.ann.hl{color:var(--hl-text,inherit)}
 mark.ann{color:inherit;background:transparent;border-radius:2px;cursor:pointer;-webkit-box-decoration-break:clone;box-decoration-break:clone}
 mark.hl.c-yellow{background:var(--hl-yellow)} mark.hl.c-green{background:var(--hl-green)} mark.hl.c-blue{background:var(--hl-blue)} mark.hl.c-pink{background:var(--hl-pink)} mark.hl.c-purple{background:var(--hl-purple)} mark.hl.c-orange{background:var(--hl-orange)}
 mark.ul{text-decoration:underline;text-decoration-color:var(--ul-red);text-decoration-thickness:2px;text-underline-offset:.24em;text-decoration-skip-ink:none}
@@ -287,6 +285,11 @@ input[type=range]{width:100%;accent-color:var(--accent);margin:0}
 .seg button{flex:1;min-width:0;border:1px solid var(--r-rule);background:transparent;border-radius:10px;padding:9px 6px;cursor:pointer;font-size:13.5px;color:var(--r-fg)}
 .seg button[aria-pressed="true"]{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent);color:var(--accent);font-weight:600}
 .swatch{display:flex;flex-direction:column;align-items:center;gap:6px}
+.themes{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.themes button{border:2px solid transparent;border-radius:14px;padding:12px 6px 9px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:4px;box-shadow:inset 0 0 0 1px rgba(128,128,128,.28)}
+.themes button[aria-pressed="true"]{border-color:var(--accent)}
+.themes b{font-size:26px;line-height:1.1;font-weight:400}
+.themes small{font-size:12.5px;opacity:.85}
 .swatch i{width:34px;height:34px;border-radius:50%;border:1px solid rgba(128,128,128,.35);display:block}
 .fontbtn{display:flex!important;flex-direction:column;gap:2px;align-items:center}
 .fontbtn b{font-size:18px;font-weight:400}
@@ -350,6 +353,11 @@ mark.pend{background:var(--hl-yellow);color:inherit;outline:1.5px dashed var(--a
 /* touch: the reader does its own selection (no Android selection toolbar) */
 #reader.touchsel #content{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
 #reader.touchsel.tsel-on #content{-webkit-user-select:text;user-select:text}
+/* memo icons and the touch-selection fill live in their own contained layer: adding or removing them inside #reader
+   used to re-lay out the whole chapter (40+ ms per page turn in a long chapter) */
+#ovl{position:absolute;inset:0;z-index:4;pointer-events:none;contain:strict}
+#ovl .note-mark{pointer-events:auto}
+#ovl.sliding .note-mark{visibility:hidden}
 .note-mark{position:fixed;z-index:4;width:22px;height:22px;display:flex;align-items:center;justify-content:center;border:0;padding:0;border-radius:6px;background:transparent;color:var(--r-muted);cursor:pointer;opacity:.85}
 .note-mark:hover{color:var(--accent);background:color-mix(in srgb,var(--r-fg) 8%,transparent)}
 .note-mark svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
@@ -454,6 +462,7 @@ mark.pend{background:var(--hl-yellow);color:inherit;outline:1.5px dashed var(--a
 <div id="cardMenu" role="menu" hidden></div>
 
 <section id="reader" hidden aria-label="책 읽기">
+  <div id="ovl"></div>
   <div id="stage">
     <div id="running"><span id="runTitle"></span></div>
     <div id="page"><div id="content"></div></div>
@@ -551,9 +560,27 @@ const FONTS = {
   system: { name: '기기 글꼴', stack: 'system-ui, -apple-system, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif' },
 };
 const MARGINS = ['clamp(16px,4vw,32px)', 'clamp(20px,6vw,64px)', 'clamp(28px,11vw,120px)'];
-const THEMES = [['auto', '자동', 'linear-gradient(135deg,#FCFCFA 50%,#16181D 50%)'], ['paper', '종이', '#FFFFFF'], ['sepia', '세피아', '#F2E9D8'], ['night', '밤', '#0F1114']];
-const DEFAULTS = { font: 'gowun', size: 19, lh: 1.8, margin: 1, theme: 'auto', mode: 'paged', justify: true, spread: 'auto', cpm: 500, pdfFit: 'page', hlTone: 'soft' };
+/* Apple Books' six themes: page and text colours for light and dark, font, weight and line spacing as Books defines them
+   (read from the app). Apple's own fonts (Publico Text, Charter, Canela Text, Proxima Nova) aren't free web fonts, so the
+   closest free ones stand in, each paired with a Korean font. lh is this app's spacing for the theme's feel. */
+const BOOK_THEMES = {
+  original: { name: '원본', light: ['#FFFFFF', '#000000'], dark: ['#000000', '#FFFFFF'], font: null, lh: null },
+  quiet: { name: '고요', light: ['#4A4A4D', '#ABABB1'], dark: ['#000000', '#8D8D93'], font: '"Source Serif 4", "Nanum Myeongjo", serif', lh: 1.75 },
+  paper: { name: '종이', light: ['#EEEDED', '#201C1C'], dark: ['#1C1C1E', '#F2F2F0'], font: 'Charter, "Bitstream Charter", "Source Serif 4", "Gowun Batang", serif', lh: 1.9 },
+  bold: { name: '볼드', light: ['#FFFFFF', '#1C1C1E'], dark: ['#000000', '#EFEFF2'], font: 'system-ui, -apple-system, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif', weight: 600, lh: 1.85 },
+  calm: { name: '평온', light: ['#F1E2C9', '#372D24'], dark: ['#423B30', '#F9ECDB'], font: 'Lora, "Gowun Batang", serif', lh: 1.9 },
+  focus: { name: '집중', light: ['#FFFCF4', '#141200'], dark: ['#18160C', '#FFF9EB'], font: 'Figtree, "Noto Sans KR", sans-serif', lh: 1.75 },
+};
+// highlight colours per theme and appearance from Books' table: yellow, green, blue, pink, purple, underline (+ opacity)
+const THEME_HL = {"original-light":["FFDC00","83DF76","8DB9FF","FF94B4","CAACFF","FF3B30",1],"original-dark":["886000","2D6810","2C5096","833859","634286","D10B00",1],"quiet-light":["855E27","3A8831","4571BE","AF4661","7254AC","FF3B30",.85],"quiet-dark":["6E5416","345C20","425A87","734056","644E7A","FF453A",.7],"paper-light":["FFDC4C","9FE285","A0C7FF","FFB0C8","D0BEFF","FF3B30",.9],"paper-dark":["886614","37681F","395996","83425E","6A4F86","D10B00",.8],"bold-light":["FFDC00","50E66A","5CAAFF","FF83A8","B893FB","FF3B30",1],"bold-dark":["886000","2D6810","2C5096","833859","634286","FF453A",1],"calm-light":["FFCE41","94DD97","9DD1FF","F5AAD7","CCBCFD","FF3B30",.9],"calm-dark":["9C762A","4E7D37","506CA3","8C576E","7E6896","D10B00",.8],"focus-light":["FFCB21","8CCF7C","9AC5FC","FC9DB5","D1B3FC","FF3B30",.8],"focus-dark":["917628","416824","446696","7D4C5D","735987","D10B00",.8]};
+const prefersDark = () => matchMedia('(prefers-color-scheme: dark)').matches;
+const themeKey = () => `${BOOK_THEMES[S.btheme] ? S.btheme : 'original'}-${S.appearance === 'dark' || (S.appearance !== 'light' && prefersDark()) ? 'dark' : 'light'}`;
+const DEFAULTS = { font: 'gowun', size: 19, lh: 1.8, margin: 1, btheme: 'original', appearance: 'auto', mode: 'paged', justify: true, spread: 'auto', cpm: 500, pdfFit: 'page', hlTone: 'soft' };
 const S = Object.assign({}, DEFAULTS, ls.get('yb-settings', {}));
+if (!('btheme' in ls.get('yb-settings', {}))) { // from the old page colours (paper / sepia / night / auto) to theme + appearance
+  S.btheme = S.theme === 'sepia' ? 'calm' : 'original';
+  S.appearance = S.theme === 'night' ? 'dark' : S.theme === 'auto' || !S.theme ? 'auto' : 'light';
+}
 if (typeof S.spread === 'boolean') S.spread = S.spread ? 'auto' : 'never';
 const saveSettings = () => ls.set('yb-settings', S);
 
@@ -1035,7 +1062,7 @@ async function importFiles(files) {
 }
 
 /* ================= reader state ================= */
-const stage = $('#stage'), page = $('#page'), content = $('#content'), sheet = $('#sheet'), selbar = $('#selbar');
+const stage = $('#stage'), page = $('#page'), content = $('#content'), sheet = $('#sheet'), selbar = $('#selbar'), ovl = $('#ovl');
 const sentinel = Object.assign(document.createElement('span'), { id: 'sentinel' });
 const R = { edit: null, ext: null, book: null, id: null, ch: 0, page: 0, pages: 1, step: 0, blocks: [], blockIdx: new Map(), st: null, lens: null, texts: null, total: 0, seeking: false };
 
@@ -1411,9 +1438,18 @@ function pageOfEl(el) {
 function currentAnchor() {
   if (!R.blocks.length) return 0;
   if (S.mode === 'paged') {
-    const cl = content.getBoundingClientRect().left;
-    for (let i = 0; i < R.blocks.length; i++)
-      for (const r of R.blocks[i].getClientRects()) if (r.height && pageOfX(r.left - cl) >= R.page) return i;
+    // blocks run in page order, so binary-search the first one that reaches this page
+    // (walking from the chapter start cost 10-20 ms per turn on a Mac deep into a long commentary chapter)
+    const cl = content.getBoundingClientRect().left, n = R.blocks.length;
+    const lastPage = i => { let p = -1; for (const r of R.blocks[i].getClientRects()) if (r.height) p = Math.max(p, pageOfX(r.left - cl)); return p; };
+    let lo = 0, hi = n - 1, ans = n - 1;
+    while (lo <= hi) {
+      const mid = (lo + hi) >> 1; let m = mid, p = lastPage(m);
+      while (p < 0 && m < hi) p = lastPage(++m); // hidden blocks (footnote asides) have no boxes
+      if (p < 0) { hi = mid - 1; continue; }
+      if (p >= R.page) { ans = m; hi = mid - 1; } else lo = m + 1;
+    }
+    return ans;
   } else {
     const top = page.getBoundingClientRect().top + 4;
     for (let i = 0; i < R.blocks.length; i++) if (R.blocks[i].getBoundingClientRect().bottom > top) return i;
@@ -1442,8 +1478,18 @@ function goPage(p, animate = true) {
   R.page = clamp(p, 0, R.pages - 1);
   content.style.transition = animate && !reduceMotion ? 'transform .3s cubic-bezier(.2,.7,.2,1)' : 'none';
   content.style.transform = `translate3d(${-R.page * R.step}px,0,0)`;
+  R.lastTurn = Date.now();
+  clearTimeout(goPage.t);
+  if (animate && !reduceMotion) {
+    // In a long chapter every layout re-flows the whole chapter (20+ ms on a Mac, far more on a phone), and any text
+    // change on screen (the page number, a memo icon) forces one. So the slide starts alone, with nothing else to lay
+    // out, and the page number, position and memo icons catch up together once it has settled.
+    ovl.classList.add('sliding');
+    goPage.t = setTimeout(() => { ovl.classList.remove('sliding'); afterMove(); }, 330);
+    return;
+  }
+  ovl.classList.remove('sliding');
   afterMove();
-  if (animate && !reduceMotion) setTimeout(paintNoteMarks, 320); // after the slide settles
 }
 function afterMove() { if (!R.relaying) R.anchor = currentAnchor(); if (TS.range) paintTsel(); paintNoteMarks(); if (R.edit) positionHandles(); updateChrome(); scheduleSave(); }
 async function next() {
@@ -1538,7 +1584,7 @@ function stampItems(st) { // give every highlight/bookmark a modified time when 
 function bury(id) { (R.st.tomb ||= []).push({ id, mt: Date.now() }); } // remember deletions so sync doesn't bring them back
 function saveNow() {
   if (!R.book) return;
-  const loc = { ch: R.ch, block: R.anchor ?? currentAnchor() };
+  const loc = { ch: R.ch, block: Date.now() - (R.lastTurn || 0) < 400 ? currentAnchor() : R.anchor ?? currentAnchor() }; // mid-slide the anchor isn't updated yet
   if (!R.st.loc || R.st.loc.ch !== loc.ch || R.st.loc.block !== loc.block) { R.st.loc = loc; R.st.locAt = Date.now(); }
   R.st.progress = bookFraction(); R.st.lastOpened = Date.now();
   if (R.total) R.st.total = R.total;
@@ -1645,10 +1691,13 @@ function paintNoteMarks() {
   noteMarks.forEach(n => n.remove()); noteMarks = [];
   if (!R.book || reader.hidden) return;
   const pr = page.getBoundingClientRect(), mid = pr.left + pr.width / 2, spread = reader.classList.contains('spread');
-  const seen = new Set();
-  for (const h of R.st.highlights) {
-    if (!h.note || seen.has(h.id)) continue;
-    const rect = [...marksOf(h.id)].flatMap(m => [...m.getClientRects()]).find(r => r.width && r.left >= pr.left - 2 && r.right <= pr.right + 2 && r.top >= pr.top - 2 && r.bottom <= pr.bottom + 2);
+  const seen = new Set(), notes = R.st.highlights.filter(h => h.note && h.ch === R.ch);
+  if (!notes.length) return;
+  const byId = new Map(); // one pass over the marks instead of a whole-chapter query per note
+  for (const m of content.querySelectorAll('[data-hid]')) { const k = m.dataset.hid; if (!byId.has(k)) byId.set(k, []); byId.get(k).push(m); }
+  for (const h of notes) {
+    if (seen.has(h.id)) continue;
+    const rect = (byId.get(h.id) || []).flatMap(m => [...m.getClientRects()]).find(r => r.width && r.left >= pr.left - 2 && r.right <= pr.right + 2 && r.top >= pr.top - 2 && r.bottom <= pr.bottom + 2);
     if (!rect) continue;
     seen.add(h.id);
     const left = spread && rect.left + rect.width / 2 < mid; // left page of a spread: outer (left) margin
@@ -1657,7 +1706,7 @@ function paintNoteMarks() {
     const x = left ? pr.left - 28 : pr.right + 6;
     Object.assign(b.style, { left: Math.max(2, Math.min(innerWidth - 24, x)) + 'px', top: rect.top + rect.height / 2 - 11 + 'px' });
     b.onclick = e => { e.stopPropagation(); hideSelbar(); hideHandles(); clearSel(); openPop('memo', h, rect); };
-    reader.appendChild(b); noteMarks.push(b);
+    ovl.appendChild(b); noteMarks.push(b);
   }
 }
 function deleteH(id) {
@@ -1811,7 +1860,7 @@ function paintTsel() {
     if (!x.width) continue;
     const d = Object.assign(document.createElement('div'), { className: 'tsel-rect' });
     Object.assign(d.style, { left: x.left + 'px', top: x.top + 'px', width: x.width + 'px', height: x.height + 'px' });
-    reader.appendChild(d); TS.rects.push(d);
+    ovl.appendChild(d); TS.rects.push(d);
   }
 }
 function setTouchRange(r) {
@@ -2329,8 +2378,9 @@ function renderSettings() {
   const seg = (k, opts) => `<div class="seg">${opts.map(([v, l]) => `<button data-set="${k}" data-val="${v}" aria-pressed="${String(S[k]) === String(v)}">${l}</button>`).join('')}</div>`;
   body().innerHTML = `
   ${R.book?.isPdf ? `<div class="field"><span class="lbl">PDF 화면 맞춤</span>${seg('pdfFit', [['page', '쪽 전체'], ['width', '폭에 맞춤']])}</div>` : ''}
-  <div class="field"><span class="lbl">지면 색</span><div class="seg">${THEMES.map(([v, l, bg]) => `<button class="swatch" data-set="theme" data-val="${v}" aria-pressed="${S.theme === v}"><i style="background:${bg}"></i>${l}</button>`).join('')}</div></div>
-  <div class="field"><span class="lbl">글꼴</span><div class="seg">${Object.entries(FONTS).map(([k, f]) => `<button class="fontbtn" data-set="font" data-val="${k}" aria-pressed="${S.font === k}"><b style="font-family:${esc(f.stack)}">가나다</b><small>${f.name}</small></button>`).join('')}</div></div>
+  <div class="field"><span class="lbl">테마</span><div class="themes">${Object.entries(BOOK_THEMES).map(([k, t]) => { const [bg, fg] = t[themeKey().endsWith('dark') ? 'dark' : 'light']; return `<button data-set="btheme" data-val="${k}" aria-pressed="${S.btheme === k}" style="background:${bg};color:${fg}"><b style="font-family:${esc(t.font || FONTS[S.font]?.stack || 'serif')};font-weight:${t.weight || 400}">가 Aa</b><small>${t.name}</small></button>`; }).join('')}</div></div>
+  <div class="field"><span class="lbl">화면 모드</span>${seg('appearance', [['auto', '자동'], ['light', '밝게'], ['dark', '어둡게']])}</div>
+  <div class="field"><span class="lbl">글꼴${S.btheme !== 'original' ? ` <small style="font-weight:400;color:var(--r-muted)">· 지금은 ‘${BOOK_THEMES[S.btheme]?.name}’ 테마 글꼴, 고르면 ‘원본’ 테마로</small>` : ''}</span><div class="seg">${Object.entries(FONTS).map(([k, f]) => `<button class="fontbtn" data-set="font" data-val="${k}" aria-pressed="${S.btheme === 'original' && S.font === k}"><b style="font-family:${esc(f.stack)}">가나다</b><small>${f.name}</small></button>`).join('')}</div></div>
   <div class="field"><span class="lbl">글자 크기</span><div class="stepper"><button data-step="size" data-d="-1" aria-label="작게">가−</button><output id="sizeOut">${S.size}px</output><button data-step="size" data-d="1" aria-label="크게">가+</button></div></div>
   <div class="field"><label for="lhIn">줄 간격 <span id="lhOut">${S.lh.toFixed(1)}</span></label><input type="range" id="lhIn" min="1.4" max="2.4" step="0.1" value="${S.lh}"></div>
   <div class="field"><span class="lbl">좌우 여백</span>${seg('margin', [[0, '좁게'], [1, '보통'], [2, '넓게']])}</div>
@@ -2342,6 +2392,8 @@ function renderSettings() {
   <div class="field"><label for="cpmIn">읽기 속도 <span id="cpmOut">1분에 ${S.cpm}자</span></label><input type="range" id="cpmIn" min="250" max="1200" step="50" value="${S.cpm}"></div>`;
   body().onclick = e => {
     const b = e.target.closest('button'); if (!b) return;
+    if (b.dataset.set === 'btheme' && BOOK_THEMES[b.dataset.val]?.lh) S.lh = BOOK_THEMES[b.dataset.val].lh;
+    if (b.dataset.set === 'font' && S.btheme !== 'original') S.btheme = 'original';
     if (b.dataset.set) { const raw = b.dataset.val; changeSetting(b.dataset.set, b.dataset.set === 'margin' ? +raw : raw); }
     else if (b.dataset.step) changeSetting('size', clamp(S.size + +b.dataset.d, 13, 32));
   };
@@ -2356,7 +2408,7 @@ function changeSetting(k, v) {
   S[k] = v; saveSettings(); applySettings();
   if (R.book) {
     if (k === 'mode') renderChapter(R.ch, { block: a }, false);
-    else if (k === 'theme' || k === 'cpm') updateChrome();
+    else if (k === 'appearance' || k === 'cpm') updateChrome();
     else if (R.book.isPdf) renderPdf(R.ch, {}, false);
     else { R.relaying = true; layout(); goTarget({ block: a }); R.relaying = false; }
   }
@@ -2367,9 +2419,17 @@ function changeSetting(k, v) {
 function applySettings() {
   reader.classList.toggle('touchsel', coarse);
   setTimeout(syncThemeColor);
-  reader.dataset.rt = S.theme;
-  const st = reader.style;
-  st.setProperty('--r-font', FONTS[S.font]?.stack || FONTS.gowun.stack);
+  const key = themeKey(), th = BOOK_THEMES[key.split('-')[0]], dark = key.endsWith('dark');
+  reader.dataset.rt = key;
+  const st = reader.style, [bg, fg] = th[dark ? 'dark' : 'light'];
+  const mix = (a, b, t) => { const h = x => [1, 3, 5].map(i => parseInt(x.slice(i, i + 2), 16)); const A = h(a), B = h(b); return `rgb(${A.map((v, i) => Math.round(v + (B[i] - v) * t)).join(',')})`; };
+  const pageDark = th.light[0] === '#4A4A4D' || dark; // Quiet's light version is a dark grey page
+  Object.entries({ '--r-bg': bg, '--r-fg': fg, '--r-muted': mix(fg, bg, .42), '--r-rule': mix(fg, bg, .86), '--r-panel': mix(bg, pageDark ? '#FFFFFF' : '#000000', pageDark ? .07 : .02),
+    '--r-link': pageDark ? '#9EAAFF' : '#3446A8', '--accent': pageDark ? '#8E9BFF' : '#3446A8', '--accent-ink': pageDark ? '#0F1114' : '#FFFFFF',
+    '--accent-soft': pageDark ? 'rgba(142,155,255,.16)' : 'rgba(52,70,168,.12)', '--ribbon': pageDark ? '#D9625F' : '#B23A3E' }).forEach(([k, v]) => st.setProperty(k, v));
+  st.colorScheme = pageDark ? 'dark' : 'light';
+  st.setProperty('--r-weight', th.weight || 400);
+  st.setProperty('--r-font', th.font || FONTS[S.font]?.stack || FONTS.gowun.stack);
   st.setProperty('--r-size', S.size + 'px');
   st.setProperty('--r-lh', S.lh);
   st.setProperty('--mx', MARGINS[S.margin] || MARGINS[1]);
@@ -3187,6 +3247,8 @@ function syncNow() {
   if (G.syncing) return G.syncing;
   G.syncing = (async () => {
     updateDriveChip();
+    // not in the middle of page turning: the merge below is heavy with a big library (~80 ms at once on a Mac)
+    for (let i = 0; i < 20 && Date.now() - (R.lastTurn || 0) < 1500; i++) await sleep(500);
     try {
       const local = {};
       for (const [k, v] of await store.entries('state')) if (isDrive(k) && v) local[k] = v;
@@ -3200,13 +3262,20 @@ function syncNow() {
         if (r.ok) { try { const j = await r.json(); remote = mergeAll(remote, j); if (j.cols && (!rcols || j.cols.at > rcols.at)) rcols = j.cols; } catch {} }
       }
       const merged = mergeAll({ books: local }, remote);
+      let remoteStale = false, n = 0;
       for (const [k, v] of Object.entries(merged.books)) {
-        if (canon(v) === canon(local[k] ? mergeBook(local[k], local[k]) : null)) continue;
+        if (++n % 4 === 0) await sleep(0); // let a page turn through between books
+        const cv = canon(v);
+        // compare in merged form on both sides: merging fills in default fields, so a raw comparison always differed
+        // and the whole state file was uploaded again on every sync
+        const rk = remote.books[k];
+        if (!remoteStale && (!rk || cv !== canon(mergeBook(rk, rk)))) remoteStale = true;
+        if (cv === canon(local[k] ? mergeBook(local[k], local[k]) : null)) continue;
         await store.put('state', k, v);
         if (R.book && R.id === k) applyRemoteState(v);
       }
       if (rcols && rcols.at > COLS.at) { Object.assign(COLS, rcols); ls.set('yb-cols', COLS); if (reader.hidden) renderLibrary(); }
-      if (!files.length || canon(merged.books) !== canon(remote.books) || (!rcols ? COLS.at > 0 : COLS.at > rcols.at)) {
+      if (!files.length || remoteStale || (!rcols ? COLS.at > 0 : COLS.at > rcols.at)) {
         const blob = new Blob([JSON.stringify({ v: 1, updated: Date.now(), books: merged.books, cols: COLS.at ? COLS : undefined })], { type: 'application/json' });
         let w;
         if (files[0]) w = await gapi(`https://www.googleapis.com/upload/drive/v3/files/${files[0].id}?uploadType=media`, { method: 'PATCH', body: blob });
@@ -3340,12 +3409,19 @@ const HL_LIGHT = { yellow: '#FCDC3F', green: '#99DC82', blue: '#95B9FF', pink: '
 const HL_DARK = { yellow: '#82611A', green: '#3D6621', blue: '#335191', pink: '#7A3D58', purple: '#5E4582', orange: '#84501E' };
 function applyHlColors(bg, dark) {
   const rgb = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
-  for (const [k, hex] of Object.entries(dark ? HL_DARK : HL_LIGHT)) {
+  const t = THEME_HL[themeKey()], a = t ? t[6] : dark ? 1 : .85;
+  const cols = { ...(dark ? HL_DARK : HL_LIGHT) };
+  if (t) ['yellow', 'green', 'blue', 'pink', 'purple'].forEach((k, i) => { cols[k] = '#' + t[i]; });
+  for (const [k, hex] of Object.entries(cols)) {
     const c = rgb(hex);
-    const out = bg.map((b, i) => dark ? 255 - (255 - b) * (255 - c[i]) / 255 : b * 0.15 + (b * c[i] / 255) * 0.85);
+    const blend = bg.map((b, i) => dark ? 255 - (255 - b) * (255 - c[i]) / 255 : b * c[i] / 255); // screen on dark pages, multiply on light
+    const out = bg.map((b, i) => b + (blend[i] - b) * a);
     reader.style.setProperty('--hl-' + k, `rgb(${out.map(Math.round).join(',')})`);
   }
-  reader.style.setProperty('--ul-red', dark ? '#FF453A' : '#FF3B30');
+  reader.style.setProperty('--ul-red', t ? '#' + t[5] : dark ? '#FF453A' : '#FF3B30');
+  // Quiet's soft grey text all but vanishes on its highlights: lift the text inside them,
+  // and on dark pages highlighted text takes the full text colour (Books' dark style sheet forces one text colour), so muted text stays readable
+  reader.style.setProperty('--hl-text', themeKey() === 'quiet-light' ? '#F4F4F8' : dark ? 'var(--r-fg)' : 'inherit');
 }
 // the installed app's title bar takes this colour: match whatever screen is showing
 function syncThemeColor() {
@@ -3358,8 +3434,8 @@ function syncThemeColor() {
   const m = $('#themeColor'); if (m && c) m.setAttribute('content', c);
 }
 new MutationObserver(syncThemeColor).observe(reader, { attributes: true, attributeFilter: ['hidden', 'data-rt'] });
-matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => setTimeout(syncThemeColor, 50));
-const APP_VERSION = 'v18';
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { if (S.appearance === 'auto') applySettings(); setTimeout(syncThemeColor, 50); });
+const APP_VERSION = 'v19';
 $('#appVer').textContent = 'My Library ' + APP_VERSION;
 // reopen the book that was open (a reload or Android closing the app in the background lands back in it).
 // The flag is cleared first and set again once the book opens, so a missing book isn't retried forever.
