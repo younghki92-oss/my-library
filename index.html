@@ -212,7 +212,6 @@ dialog.lib-dlg::backdrop{background:var(--scrim)}
 #content > :first-child{margin-top:0}
 #content img,#content svg{max-width:100%;height:auto;max-height:calc(var(--page-h,80vh) * .94);object-fit:contain;display:block;margin:.6em auto;break-inside:avoid}
 #content img.inl{display:inline;height:1.15em;width:auto;max-height:none;margin:0 .05em;vertical-align:-.22em}
-#reader.darkpage #content img.inl.ink{filter:invert(1);opacity:.88}
 #content blockquote{margin:1.1em 0;padding-left:1em;border-left:2px solid var(--r-rule);color:var(--r-muted)}
 #content a{color:var(--r-link);text-decoration-thickness:1px;text-underline-offset:.18em}
 #content table{border-collapse:collapse;font-size:.9em}
@@ -1387,25 +1386,38 @@ function markInlineImg(img) {
   if (img.classList.contains('inl') && img.complete && img.naturalWidth && !img.dataset.ink) clearPaper(img);
 }
 // dark letters on white paper → the same letters on a transparent ground, so they sit on any page colour (inverted on dark pages)
+// The ink is made once per picture, in a dark and a light version, and reused on every chapter render and theme switch.
+// (A CSS invert filter on dark pages ran on every frame for the dozens of letter pictures per chapter in books like
+// Stuart's Exodus, and every render used to redo the canvas work.)
+const INK = new Map(); // original picture URL → { light, dark } blob URLs, or null when it isn't dark-on-light paper
+const inkDark = () => reader.classList.contains('darkpage');
+function useInk(img, e) { img.dataset.ink = '1'; img.dataset.orig = img.dataset.orig || img.src; img.src = e[inkDark() ? 'dark' : 'light']; img.classList.add('ink'); }
 function clearPaper(img) {
+  const key = img.src;
   img.dataset.ink = '1';
+  if (INK.has(key)) { const e = INK.get(key); if (e && typeof e.then !== 'function') useInk(img, e); else if (e) e.then(v => v && useInk(img, v)); return; }
   try {
     const w = img.naturalWidth, h = img.naturalHeight;
-    if (w * h > 400000) return;
+    if (w * h > 400000) { INK.set(key, null); return; }
     const c = document.createElement('canvas'); c.width = w; c.height = h;
     const x = c.getContext('2d'); x.drawImage(img, 0, 0);
     const d = x.getImageData(0, 0, w, h), px = d.data;
     const lum = i => (px[i] * 299 + px[i + 1] * 587 + px[i + 2] * 114) / 1000;
     const corners = [0, (w - 1) * 4, (h - 1) * w * 4, (h * w - 1) * 4];
-    if (corners.some(i => px[i + 3] > 200 && lum(i) < 200)) return; // not dark-on-light paper
-    for (let i = 0; i < px.length; i += 4) {
-      const a = Math.max(0, Math.min(255, (255 - lum(i)) * 1.25)) * px[i + 3] / 255;
-      px[i] = px[i + 1] = px[i + 2] = 0; px[i + 3] = a;
-    }
-    x.putImageData(d, 0, 0);
-    c.toBlob(b => { if (b) { img.src = URL.createObjectURL(b); img.classList.add('ink'); } });
-  } catch {}
+    if (corners.some(i => px[i + 3] > 200 && lum(i) < 200)) { INK.set(key, null); return; } // not dark-on-light paper
+    const alpha = new Uint8ClampedArray(w * h);
+    for (let i = 0, j = 0; i < px.length; i += 4, j++) alpha[j] = Math.max(0, Math.min(255, (255 - lum(i)) * 1.25)) * px[i + 3] / 255;
+    const make = (v, scale) => new Promise(res => {
+      for (let i = 0, j = 0; i < px.length; i += 4, j++) { px[i] = px[i + 1] = px[i + 2] = v; px[i + 3] = alpha[j] * scale; }
+      x.putImageData(d, 0, 0);
+      c.toBlob(b => res(b ? URL.createObjectURL(b) : null));
+    });
+    const job = make(0, 1).then(light => make(240, .9).then(dark => { const e = light && dark ? { light, dark } : null; INK.set(key, e); return e; }));
+    INK.set(key, job);
+    job.then(e => e && useInk(img, e));
+  } catch { INK.set(key, null); }
 }
+function swapInk() { for (const img of content.querySelectorAll('img.ink')) { const e = INK.get(img.dataset.orig); if (e && typeof e.then !== 'function') img.src = e[inkDark() ? 'dark' : 'light']; } }
 // two pages side by side: "auto" picks it for wide, near-square-or-wider screens (an unfolded Fold, a laptop window)
 function wantSpread() {
   if (R.book?.isPdf ? S.pdfFit === 'width' : S.mode !== 'paged') return false;
@@ -3429,13 +3441,15 @@ function syncThemeColor() {
   const c = getComputedStyle(el).backgroundColor;
   const [r, g, b] = (getComputedStyle(reader).backgroundColor.match(/\d+(\.\d+)?/g) || [255, 255, 255]).map(Number);
   const dark = 0.2126 * r + 0.7152 * g + 0.0722 * b < 110;
+  const flipped = reader.classList.contains('darkpage') !== dark;
   reader.classList.toggle('darkpage', dark);
+  if (flipped) swapInk(); // letter pictures switch to their light/dark ink
   applyHlColors([r, g, b], dark);
   const m = $('#themeColor'); if (m && c) m.setAttribute('content', c);
 }
 new MutationObserver(syncThemeColor).observe(reader, { attributes: true, attributeFilter: ['hidden', 'data-rt'] });
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { if (S.appearance === 'auto') applySettings(); setTimeout(syncThemeColor, 50); });
-const APP_VERSION = 'v19';
+const APP_VERSION = 'v20';
 $('#appVer').textContent = 'My Library ' + APP_VERSION;
 // reopen the book that was open (a reload or Android closing the app in the background lands back in it).
 // The flag is cleared first and set again once the book opens, so a missing book isn't retried forever.
